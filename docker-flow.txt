@@ -10,11 +10,15 @@
     - Install ffmpeg
     - Ask for specific vosk model (if wanted) save in backend/recipes/extraction/utils
         - Else install: https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip
-    - Download food databank from https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2025-04-24.zip
-        - unzip
+
 
 - Create frontend container
     - Install npm dependencies
 
-- Run hehe
+- Configure Keycloak
+    - Create realm and public client for the web app
+    - Set valid redirect URIs to http://localhost:4200/* and silent-check-sso.html
+    - Expose realm OIDC issuer and JWKS endpoints
+    - Provide .env values for backend verification
 
+- Run hehe

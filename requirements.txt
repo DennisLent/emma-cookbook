@@ -4,6 +4,7 @@ python-decouple
 Pillow
 djangorestframework
 djangorestframework-simplejwt
+cryptography
 recipe-scrapers
 ingredient-parser-nlp
 django-cors-headers

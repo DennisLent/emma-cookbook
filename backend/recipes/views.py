@@ -49,7 +49,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             data = dict(request.data)
         print(">>> After copy/normalize:", data)
 
-        for opt in ("servings", "prep_time", "cook_time", "total_time"):
+        for opt in (
+            "servings", "prep_time", "cook_time", "total_time",
+            "origin", "source_name", "source_url", "author_name",
+            "cuisine", "course", "difficulty", "calories",
+            "nutrition", "equipment", "notes", "video_url",
+        ):
             if not data.get(opt):
                 data.pop(opt, None)
         print(">>> After dropping blank optionals:", data)

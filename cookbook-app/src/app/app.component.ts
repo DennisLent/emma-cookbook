@@ -12,9 +12,5 @@ import { AuthService } from './auth/auth.service';
 })
 export class AppComponent {
   title = 'cookbook-app';
-  constructor(private auth: AuthService) {
-    if (auth.getAccessToken() && !auth.isAuthenticated()) {
-      auth.logout();
-    }
-  }
+  constructor(private auth: AuthService) {}
 }

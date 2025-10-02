@@ -67,7 +67,8 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'cookbook.authentication.OIDCAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
@@ -160,3 +161,15 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Keycloak / OIDC settings
+KEYCLOAK_REALM = config('KEYCLOAK_REALM', default='cookbook')
+KEYCLOAK_URL = config('KEYCLOAK_URL', default='http://localhost:8080')
+KEYCLOAK_ISSUER = config('KEYCLOAK_ISSUER', default=f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}")
+KEYCLOAK_CLIENT_ID = config('KEYCLOAK_CLIENT_ID', default='cookbook-web')
+KEYCLOAK_AUDIENCE = config('KEYCLOAK_AUDIENCE', default=KEYCLOAK_CLIENT_ID)
+KEYCLOAK_JWKS_URL = config(
+    'KEYCLOAK_JWKS_URL',
+    default=f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
+)
+KEYCLOAK_ADMIN_ROLE = config('KEYCLOAK_ADMIN_ROLE', default='cookbook-admin')

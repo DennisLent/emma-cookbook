@@ -61,6 +61,20 @@ class RecipeSerializer(serializers.ModelSerializer):
     total_time  = serializers.DurationField(required=False)
     servings    = serializers.IntegerField(required=False)
 
+    # Optional metadata
+    origin       = serializers.CharField(required=False, allow_blank=True)
+    source_name  = serializers.CharField(required=False, allow_blank=True)
+    source_url   = serializers.URLField(required=False, allow_blank=True)
+    author_name  = serializers.CharField(required=False, allow_blank=True)
+    cuisine      = serializers.CharField(required=False, allow_blank=True)
+    course       = serializers.CharField(required=False, allow_blank=True)
+    difficulty   = serializers.ChoiceField(required=False, choices=[('easy','easy'),('medium','medium'),('hard','hard')])
+    calories     = serializers.IntegerField(required=False, allow_null=True)
+    nutrition    = serializers.JSONField(required=False)
+    equipment    = serializers.CharField(required=False, allow_blank=True)
+    notes        = serializers.CharField(required=False, allow_blank=True)
+    video_url    = serializers.URLField(required=False, allow_blank=True)
+
     tags = serializers.SlugRelatedField(
         many=True,
         slug_field='name',
@@ -95,6 +109,9 @@ class RecipeSerializer(serializers.ModelSerializer):
             'tags', 'ingredients', 'ingredients_data',
             'prep_time', 'cook_time', 'total_time',
             'servings',
+            'origin', 'source_name', 'source_url', 'author_name',
+            'cuisine', 'course', 'difficulty', 'calories', 'nutrition',
+            'equipment', 'notes', 'video_url',
             'comments',
             'ratings'
         ]
@@ -147,4 +164,3 @@ class RecipeSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
-

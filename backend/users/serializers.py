@@ -5,19 +5,26 @@ from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     avatar = serializers.ImageField(required=False)
+    theme = serializers.JSONField(required=False)
+    layout = serializers.JSONField(required=False)
+    widget_whitelist = serializers.JSONField(required=False)
 
     class Meta:
         model = User
         fields = [
-            'id', 
-            'username', 
-            'first_name', 
+            'id',
+            'username',
+            'first_name',
             'last_name',
-            'bio', 
-            'avatar', 
-            'preferences'
+            'bio',
+            'avatar',
+            'preferences',
+            'role',
+            'theme',
+            'layout',
+            'widget_whitelist',
         ]
-        read_only_fields = ['id', 'username']
+        read_only_fields = ['id', 'username', 'role']
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -29,10 +36,17 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     avatar = serializers.ImageField(required=False, allow_null=True)
     bio = serializers.CharField(required=False, allow_blank=True)
     preferences = serializers.JSONField(required=False)
+    theme = serializers.JSONField(required=False)
+    layout = serializers.JSONField(required=False)
+    widget_whitelist = serializers.JSONField(required=False)
 
     class Meta:
         model = User
-        fields = ['username', 'password', 'password2', 'bio', 'avatar', 'preferences']
+        fields = [
+            'username', 'password', 'password2',
+            'bio', 'avatar', 'preferences',
+            'theme', 'layout', 'widget_whitelist'
+        ]
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:

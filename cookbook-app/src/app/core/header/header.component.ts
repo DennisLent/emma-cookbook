@@ -32,7 +32,7 @@ export class HeaderComponent {
   constructor(private auth: AuthService) {}
 
   isLoggedIn(): boolean {
-    return this.auth.isLoggedIn();
+    return this.auth.isLoggedInSync();
   }
 
   logout(): void {

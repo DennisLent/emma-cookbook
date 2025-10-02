@@ -14,27 +14,48 @@ class Ingredient(models.Model):
         return self.name
 
 class Recipe(models.Model):
-    # Title of recipe (required)
+    # Title of recipe
     title = models.CharField(max_length=255)
-    # Description of recipe (optional)
+    # Description of recipe
     description = models.TextField(blank=True)
-    # Ingredients (required)
+    # Ingredients
     ingredients = models.ManyToManyField(Ingredient, through="RecipeIngredient")
-    # Instructions (required)
+    # Instructions
     instructions = models.TextField()
-    # Created by and created at (auto)
+    # Created by and created at
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recipes')
     created_at = models.DateTimeField(auto_now_add=True)
-    # Tags for recipes (optional)
+    # Tags for recipes
     tags = models.ManyToManyField(Tag, related_name='recipes', blank=True)
-    # Servings (optional)
+    # Servings
     servings = models.PositiveIntegerField(blank=True, null=True)
-    # Cooking times (prep, cook, total)
+    # Cooking times
     prep_time = models.DurationField(blank=True, null=True)
     cook_time = models.DurationField(blank=True, null=True)
     total_time = models.DurationField(blank=True, null=True)
-    # Optional
+    # Optional image
     image = models.ImageField(upload_to='recipe_images/', blank=True, null=True)
+
+    # Optional metadata
+    origin = models.CharField(max_length=255, blank=True)
+    source_name = models.CharField(max_length=255, blank=True)
+    source_url = models.URLField(blank=True)
+    author_name = models.CharField(max_length=255, blank=True)
+    cuisine = models.CharField(max_length=100, blank=True)
+    course = models.CharField(max_length=100, blank=True)
+
+    DIFFICULTY_CHOICES = (
+        ("easy", "easy"),
+        ("medium", "medium"),
+        ("hard", "hard"),
+    )
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, blank=True)
+
+    calories = models.PositiveIntegerField(blank=True, null=True)
+    nutrition = models.JSONField(default=dict, blank=True)
+    equipment = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    video_url = models.URLField(blank=True)
 
     def __str__(self):
         return self.title
