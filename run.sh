@@ -8,6 +8,7 @@ DJANGO_DIR="backend"
 ANGULAR_DIR="cookbook-app"
 DJANGO_PORT=8000
 ANGULAR_PORT=4200
+FRONTEND_MODE=${FRONTEND_MODE:-jwt}
 
 activate_venv() {
   if [[ -f "venv/bin/activate" ]]; then
@@ -45,8 +46,13 @@ start_frontend() {
   echo "[frontend] Installing NPM deps (only if needed)..."
   npm install
 
-  echo "[frontend] Running ng serve on http://127.0.0.1:${ANGULAR_PORT}/"
-  ng serve --port "${ANGULAR_PORT}" --open
+  if [[ "${FRONTEND_MODE}" == "keycloak" ]]; then
+    echo "[frontend] Running Keycloak dev environment on http://127.0.0.1:${ANGULAR_PORT}/"
+    npm run start:keycloak -- --port "${ANGULAR_PORT}" --open
+  else
+    echo "[frontend] Running JWT dev environment on http://127.0.0.1:${ANGULAR_PORT}/"
+    ng serve --port "${ANGULAR_PORT}" --open
+  fi
 
   popd >/dev/null
 }

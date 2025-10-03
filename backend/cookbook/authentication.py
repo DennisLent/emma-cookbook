@@ -7,6 +7,9 @@ from rest_framework import exceptions
 
 import jwt
 from jwt import PyJWKClient
+from jwt import InvalidTokenError, ExpiredSignatureError
+from jwt.exceptions import PyJWKClientError
+import urllib.error
 
 
 class OIDCAuthentication(BaseAuthentication):
@@ -16,6 +19,9 @@ class OIDCAuthentication(BaseAuthentication):
     """
 
     def authenticate(self, request) -> Optional[Tuple[object, str]]:
+        # Only active when backend is configured for Keycloak
+        if getattr(settings, 'AUTH_PROVIDER', 'jwt') != 'keycloak':
+            return None
         auth = get_authorization_header(request).split()
         if not auth or auth[0].lower() != b'bearer':
             return None
@@ -26,6 +32,18 @@ class OIDCAuthentication(BaseAuthentication):
             raise exceptions.AuthenticationFailed('Invalid Authorization header')
 
         token = auth[1].decode('utf-8')
+
+        # If token is not from our Keycloak issuer, ignore and allow other auth backends
+        try:
+            unverified = jwt.decode(token, options={"verify_signature": False})
+            token_iss = unverified.get('iss')
+            kc_iss = getattr(settings, 'KEYCLOAK_ISSUER', None)
+            if not kc_iss or token_iss != kc_iss:
+                return None
+        except Exception:
+            # Not a JWT we can parse; let other authenticators try
+            return None
+
         payload = self._decode_token(token)
         user = self._get_or_create_user_from_claims(payload)
         return user, token
@@ -52,10 +70,10 @@ class OIDCAuthentication(BaseAuthentication):
                 },
             )
             return payload
-        except jwt.ExpiredSignatureError:
+        except ExpiredSignatureError:
             raise exceptions.AuthenticationFailed('Token expired')
-        except jwt.InvalidTokenError as e:
-            raise exceptions.AuthenticationFailed(f'Invalid token: {e}')
+        except (InvalidTokenError, PyJWKClientError, urllib.error.URLError) as e:
+            raise exceptions.AuthenticationFailed(f'OIDC token verification failed: {e}')
 
     def _get_or_create_user_from_claims(self, claims: dict):
         User = get_user_model()
@@ -99,4 +117,3 @@ class OIDCAuthentication(BaseAuthentication):
 
         user.save()
         return user
-

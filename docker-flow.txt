@@ -21,4 +21,9 @@
     - Expose realm OIDC issuer and JWKS endpoints
     - Provide .env values for backend verification
 
+- Choose auth provider
+    - Local dev uses JWT by default (ng serve development)
+    - To run with Keycloak locally: npm run start:keycloak
+    - Production can be built with either provider by editing environment.prod.ts (authProvider)
+
 - Run hehe

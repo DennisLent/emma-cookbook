@@ -4,6 +4,14 @@ A lightweight, self‑hosted recipe app with an Angular frontend and a Django ba
 
 ---
 
+## Name brainstorm:
+- cookbooked?
+- Eneldo
+- RecipePod
+- CookHub
+- Cookdict
+- Cookimize / Chefimize
+
 ## 1) One‑liner & Value Prop
 
 **“Your household’s simple, beautiful recipe box—private, fast, and easy to cook from.”**
@@ -229,6 +237,21 @@ body { background: var(--bg); color: var(--text); }
 # Frontend MVP — Final Scope (supersedes earlier scope)
 
 A complete, frontend‑focused MVP definition covering all features you listed. The backend/APIs may be mocked during development; the UI/UX below is final for MVP.
+
+---
+
+## Auth Modes (JWT or Keycloak)
+
+- Local development uses JWT by default. `run.sh` starts Django and Angular; Angular runs with `environment.ts` where `authProvider: 'jwt'`.
+- Keycloak setup is supported for SSO (PKCE + silent SSO). To run the app in Keycloak mode locally: `cd cookbook-app && npm run start:keycloak`. Configure backend `.env` with `KEYCLOAK_*` (issuer, realm, client id, jwks URL).
+- Production build defaults to Keycloak (`environment.prod.ts` has `authProvider: 'keycloak'`). Switch to JWT by changing `authProvider` to `'jwt'` if desired.
+- Angular provides two environments: `development` (JWT) and `keycloak` (SSO). Use `npm run start:jwt` or `npm run start:keycloak` to choose.
+- Backend accepts both Keycloak OIDC Bearer tokens and SimpleJWT tokens. You can keep JWT endpoints enabled for local/dev while using Keycloak in production.
+
+You can also drive the local choice via run.sh:
+
+- `FRONTEND_MODE=keycloak ./run.sh` → starts Angular in Keycloak mode
+- `./run.sh` → starts Angular in JWT mode
 
 ## 1) Core Capabilities
 

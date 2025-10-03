@@ -10,7 +10,8 @@ export const AuthInterceptor: HttpInterceptorFn = (
 ): Observable<HttpEvent<any>> => {
   const auth = inject(AuthService);
 
-  const needsAuth = req.url.includes('/api/') || req.url.includes('/recipes/preview');
+  const isAuthEndpoint = req.url.includes('/api/auth/');
+  const needsAuth = !isAuthEndpoint && (req.url.includes('/api/') || req.url.includes('/recipes/preview'));
   if (!needsAuth) {
     return next(req);
   }

@@ -68,6 +68,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'cookbook.authentication.OIDCAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
@@ -163,6 +164,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Keycloak / OIDC settings
+AUTH_PROVIDER = config('AUTH_PROVIDER', default='jwt')
 KEYCLOAK_REALM = config('KEYCLOAK_REALM', default='cookbook')
 KEYCLOAK_URL = config('KEYCLOAK_URL', default='http://localhost:8080')
 KEYCLOAK_ISSUER = config('KEYCLOAK_ISSUER', default=f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}")
