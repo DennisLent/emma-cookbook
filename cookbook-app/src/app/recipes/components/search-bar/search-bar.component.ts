@@ -46,6 +46,19 @@ export class SearchBarComponent {
     this.emitSearch();
   }
 
+  isSelected(name: string): boolean {
+    return this.selectedTags.includes(name);
+  }
+
+  toggleTag(name: string) {
+    if (this.isSelected(name)) {
+      this.selectedTags = this.selectedTags.filter(t => t !== name);
+    } else {
+      this.selectedTags = [...this.selectedTags, name];
+    }
+    this.emitSearch();
+  }
+
   get autocompleteOptions(): string[] {
     if (!this.term) return this.recipeTitles.slice(0, 3);
     return this.recipeTitles

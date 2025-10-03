@@ -5,7 +5,7 @@ import { RecipeService } from '../../recipes.service';
 import { CarouselComponent } from '../../components/carousel/carousel.component';
 import { RouterModule } from '@angular/router';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatCardModule } from '@angular/material/card';
+import { MatIconModule } from '@angular/material/icon';
 import { SearchBarComponent } from '../../components/search-bar/search-bar.component';
 
 @Component({
@@ -16,7 +16,7 @@ import { SearchBarComponent } from '../../components/search-bar/search-bar.compo
     CommonModule,
     RouterModule,
     MatChipsModule,
-    MatCardModule,
+    MatIconModule,
     SearchBarComponent
   ],
   templateUrl: './recipe-list.component.html',

@@ -1,33 +1,53 @@
-.search-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding: 0 1rem;
+.search-wrap { margin-top: 16px; }
 
-  // make each field expand
-  .search-input,
-  .tag-select {
-    flex: 1 1 240px;
-    min-width: 200px;
-  }
+.search-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
-// the row of selected‐tag chips
+.search-icon {
+  color: var(--color-muted);
+  margin-right: 8px;
+}
+
+.search-input {
+  border: none;
+  outline: none;
+  flex: 1 1 auto;
+  font-size: 16px;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.filters-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-label { color: var(--color-muted); font-size: 14px; }
+
+.tags mat-chip {
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.tags mat-chip.selected {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-text);
+  border-color: var(--color-primary);
+}
+
 .active-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  overflow-x: auto;
-
-  &::-webkit-scrollbar {
-    height: 6px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-  }
+  gap: 8px;
+  margin-top: 8px;
 }

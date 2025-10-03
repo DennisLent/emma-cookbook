@@ -1,31 +1,36 @@
-<section class="recipe-suggestions">
-    <app-carousel [recipes]="suggestedRecipes"></app-carousel>
-</section>
+<section class="recipe-suggestions container">
+  <app-carousel [recipes]="suggestedRecipes"></app-carousel>
+  </section>
 
-<section class="recipes-container">
-  <app-search-bar [availableTags]="allTags" [recipeTitles]="recipeTitles" (search)="handleSearch($event)"></app-search-bar>
+<section class="recipes-container container">
+  <app-search-bar
+    [availableTags]="allTags"
+    [recipeTitles]="recipeTitles"
+    (search)="handleSearch($event)">
+  </app-search-bar>
 
   <div class="recipe-grid">
-
-    <mat-card class="recipe-card" *ngFor="let recipe of filteredRecipes" [routerLink]="['/recipes', recipe.id]">
-      <img mat-card-image [src]="recipe.image || placeholderImage" alt="{{ recipe.title }}" />
-
-      <mat-card-header>
-        <mat-card-title>{{ recipe.title }}</mat-card-title>
-      </mat-card-header>
-
-      <mat-card-content>
-
-        <mat-chip-set class="tags" *ngIf="recipe.tags?.length">
-          <mat-chip *ngFor="let tag of recipe.tags" color="primary">{{ tag }}</mat-chip>
-        </mat-chip-set>
-      </mat-card-content>
-
-    </mat-card>
-
+    <a class="recipe-card card" *ngFor="let recipe of filteredRecipes" [routerLink]="['/recipes', recipe.id]">
+      <div class="media">
+        <img [src]="recipe.image || placeholderImage" alt="{{ recipe.title }}" />
+      </div>
+      <div class="content">
+        <h3 class="title">{{ recipe.title }}</h3>
+        <p class="desc" *ngIf="recipe.description">{{ recipe.description }}</p>
+        <div class="meta">
+          <span *ngIf="recipe.cook_time">
+            <mat-icon>timer</mat-icon> {{ recipe.cook_time | slice:3:5 }} min
+          </span>
+          <span *ngIf="recipe.servings">
+            <mat-icon>group</mat-icon> {{ recipe.servings }} servings
+          </span>
+        </div>
+        <div class="tags" *ngIf="recipe.tags?.length">
+          <span class="chip" *ngFor="let tag of recipe.tags">{{ tag }}</span>
+        </div>
+      </div>
+    </a>
   </div>
 
   <div #anchor class="loading-anchor"></div>
-
 </section>
-

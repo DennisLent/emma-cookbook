@@ -1,169 +1,105 @@
-<div class="add-recipe-container">
-  
+<div class="add-recipe-container container">
+  <div class="header">
+    <a routerLink="/" class="back"><mat-icon>arrow_back</mat-icon></a>
+    <h2>Add Recipe</h2>
+  </div>
 
-  <mat-button-toggle-group [(ngModel)]="mode" aria-label="mode" class="mode-toggle" name="mode">
-    <mat-button-toggle value="manual">Manual</mat-button-toggle>
-    <mat-button-toggle value="website">Website</mat-button-toggle>
-    <mat-button-toggle value="youtube">YouTube</mat-button-toggle>
-  </mat-button-toggle-group>
+  <!-- Top segmented tabs -->
+  <div class="segmented card">
+    <button class="seg" [class.active]="mode==='manual'" (click)="mode='manual'">Manual</button>
+    <button class="seg" [class.active]="mode==='paste'" (click)="mode='paste'">Paste</button>
+    <button class="seg" [class.active]="mode==='url'" (click)="mode='url'">From URL</button>
+  </div>
 
-  <mat-divider></mat-divider>
+  <!-- URL notice / optional preview -->
+  <div *ngIf="mode==='url'" class="url-block card">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Recipe URL</mat-label>
+      <input matInput [(ngModel)]="websiteUrl" />
+      <mat-hint>Reference URL for this recipe. Fill details manually below.</mat-hint>
+    </mat-form-field>
+    <button mat-stroked-button color="primary" (click)="onPreviewWebsite()" [disabled]="!websiteUrl || isPreviewing">
+      <mat-icon>preview</mat-icon> Try Preview
+    </button>
+    <p class="error" *ngIf="previewError">{{ previewError }}</p>
+  </div>
 
-  <ng-container [ngSwitch]="mode">
-      <div *ngSwitchCase="'website'" class="preview-block">
-          <mat-form-field appearance="outline">
-          <mat-label>Recipe page URL</mat-label>
-          <input matInput [(ngModel)]="websiteUrl" />
-          </mat-form-field>
-          <button
-            mat-flat-button
-            color="primary"
-            (click)="onPreviewWebsite()"
-            [disabled]="!websiteUrl || isPreviewing"
-          >
-          <mat-icon>preview</mat-icon>
-          Preview
-          </button>
-      </div>
+  <!-- Paste block -->
+  <div *ngIf="mode==='paste'" class="paste-block card">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Paste Recipe</mat-label>
+      <textarea matInput rows="10" placeholder="Paste ingredients and steps here (one per line)" [(ngModel)]="pasteText" (blur)="applyPasted(pasteText)"></textarea>
+      <mat-hint>Paste your recipe text. We'll try to split it into ingredients and steps automatically later.</mat-hint>
+    </mat-form-field>
+  </div>
 
-      <div *ngSwitchCase="'youtube'" class="preview-block">
-        <mat-form-field appearance="outline">
-            <mat-label>YouTube video URL</mat-label>
-            <input matInput [(ngModel)]="videoUrl" />
-        </mat-form-field>
-        <button
-            mat-flat-button
-            color="primary"
-            (click)="onPreviewYoutube()"
-            [disabled]="!videoUrl || isPreviewing"
-        >
-            <mat-icon>play_circle</mat-icon>
-            Preview
-        </button>
-      </div>
-  </ng-container>
-
-  <p class="error" *ngIf="previewError">{{ previewError }}</p>
-
-  <form
-    [formGroup]="recipeForm"
-    (ngSubmit)="onSubmit()"
-    class="recipe-form"
-  >
-
+  <!-- Main form -->
+  <form [formGroup]="recipeForm" (ngSubmit)="onSubmit()" class="recipe-form card">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Title</mat-label>
-      <input matInput formControlName="title" />
+      <input matInput formControlName="title" placeholder="Recipe title" />
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Description</mat-label>
-      <textarea
-        matInput
-        rows="3"
-        formControlName="description"
-      ></textarea>
+      <textarea matInput rows="3" formControlName="description" placeholder="Brief description"></textarea>
     </mat-form-field>
 
-    <fieldset class="time-fields">
-      <legend>Time</legend>
-
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Prep Time</mat-label>
+    <div class="grid-3">
+      <mat-form-field appearance="outline">
+        <mat-label>Servings</mat-label>
+        <input matInput type="number" formControlName="servings" min="1" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Prep (min)</mat-label>
         <input matInput formControlName="prep_time" placeholder="e.g. 15 min" />
       </mat-form-field>
-
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Cook Time</mat-label>
+      <mat-form-field appearance="outline">
+        <mat-label>Cook (min)</mat-label>
         <input matInput formControlName="cook_time" placeholder="e.g. 30 min" />
       </mat-form-field>
+    </div>
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Total Time</mat-label>
-        <input matInput formControlName="total_time" placeholder="e.g. 45 min" />
-      </mat-form-field>
-    </fieldset>
-
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Servings</mat-label>
-      <input matInput type="number" formControlName="servings" min="1" />
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Instructions</mat-label>
-      <textarea
-        matInput
-        rows="6"
-        formControlName="instructions"
-      ></textarea>
-    </mat-form-field>
+    <div class="image-row">
+      <input #fileInput type="file" accept="image/*" hidden (change)="onFileChange($event)" />
+      <button mat-stroked-button (click)="fileInput.click()"><mat-icon>upload</mat-icon> Upload Image</button>
+      <span class="file-name" *ngIf="recipeForm.value.image">{{ recipeForm.value.image.name }}</span>
+    </div>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Tags</mat-label>
       <mat-select formControlName="tags" multiple>
-        <mat-option *ngFor="let t of tags" [value]="t.name">{{
-          t.name
-        }}</mat-option>
+        <mat-option *ngFor="let t of tags" [value]="t.name">{{ t.name }}</mat-option>
       </mat-select>
     </mat-form-field>
 
     <div formArrayName="ingredients_data" class="ingredients-block">
-      <div
-        class="ingredient-row"
-        *ngFor="let g of ingredients.controls; let i = index"
-        [formGroupName]="i"
-      >
+      <label>Ingredients *</label>
+      <div class="ingredient-row" *ngFor="let g of ingredients.controls; let i = index" [formGroupName]="i">
         <mat-form-field appearance="outline" class="flex-2">
-          <mat-label>Ingredient</mat-label>
-          <input matInput formControlName="ingredient" />
+          <mat-label>Item *</mat-label>
+          <input matInput formControlName="ingredient" placeholder="e.g. Flour" />
         </mat-form-field>
-
-        <mat-form-field appearance="outline" class="flex-3">
+        <mat-form-field appearance="outline" class="flex-1">
           <mat-label>Amount</mat-label>
-          <input matInput formControlName="amount" />
+          <input matInput formControlName="amount" placeholder="e.g. 2 cups" />
         </mat-form-field>
-
-        <button
-          mat-icon-button
-          color="warn"
-          (click)="removeIngredient(i)"
-        >
-          <mat-icon>delete</mat-icon>
-        </button>
+        <button mat-icon-button color="warn" (click)="removeIngredient(i)"><mat-icon>delete</mat-icon></button>
       </div>
-
-      <button mat-stroked-button (click)="addIngredient()">
-        <mat-icon>add</mat-icon> Add Ingredient
-      </button>
+      <button mat-stroked-button (click)="addIngredient()"><mat-icon>add</mat-icon> Add Ingredient</button>
     </div>
 
-    <div class="file-upload">
-      <input
-        #fileInput
-        type="file"
-        accept="image/*"
-        hidden
-        (change)="onFileChange($event)"
-      />
-      <button mat-stroked-button (click)="fileInput.click()" class="full-width">
-        <mat-icon>upload</mat-icon>
-        Upload Image
-      </button>
-      <span class="file-name" *ngIf="recipeForm.value.image">{{
-        recipeForm.value.image.name
-      }}</span>
-    </div>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Steps *</mat-label>
+      <textarea matInput rows="6" formControlName="instructions" placeholder="Steps (one per line)"></textarea>
+    </mat-form-field>
 
-    <button
-      mat-flat-button
-      color="accent"
-      class="full-width"
-      [disabled]="recipeForm.invalid"
-      type="submit"
-    >
-      <mat-icon>save</mat-icon>
-      Save Recipe
-    </button>
-    
+    <div class="actions">
+      <button mat-stroked-button type="button" routerLink="/" color="primary">Cancel</button>
+      <button mat-flat-button color="primary" [disabled]="recipeForm.invalid" type="submit">
+        <mat-icon>save</mat-icon>
+        Save Recipe
+      </button>
+    </div>
   </form>
 </div>

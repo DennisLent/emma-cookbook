@@ -31,15 +31,16 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
   styleUrls: ['./recipe-add.component.scss']
 })
 export class AddRecipeComponent implements OnInit {
-  mode: 'manual' | 'website' | 'youtube' = 'manual';
+  // UI modes per design: Manual | Paste | From URL
+  mode: 'manual' | 'paste' | 'url' = 'manual';
   websiteUrl = '';
-  videoUrl = '';
   isPreviewing = false;
   previewError = '';
 
   tags: Tag[] = [];
 
   recipeForm!: FormGroup;
+  pasteText = '';
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
@@ -102,15 +103,12 @@ export class AddRecipeComponent implements OnInit {
     });
   }
 
-  onPreviewYoutube() {
-    this.previewError = '';
-    this.isPreviewing = true;
-    this.recipeService.previewFromYoutube(this.videoUrl).subscribe({
-      next: recipe => this.populateForm(recipe),
-      error: e =>
-        (this.previewError = e.error?.detail || 'Preview failed'),
-      complete: () => (this.isPreviewing = false)
-    });
+  // Paste mode helper: accept pasted text and place into instructions
+  applyPasted(text: string) {
+    const cleaned = (text || '').trim();
+    if (cleaned) {
+      this.recipeForm.get('instructions')?.setValue(cleaned);
+    }
   }
 
   private parseTime(input: string): string {
