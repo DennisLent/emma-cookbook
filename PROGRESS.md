@@ -27,7 +27,7 @@ Legend: [x] completed, [ ] not yet
 - [x] Instant search by title
 - [x] Tag filtering with chips
 - [x] Suggestions carousel (server-provided)
-- [ ] Filter by ingredients
+- [x] Filter by ingredients
 - [ ] Sort by newest/top rated
 
 ## Cooking Experience

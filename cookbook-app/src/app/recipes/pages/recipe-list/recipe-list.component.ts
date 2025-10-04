@@ -2,7 +2,6 @@ import { Component, OnInit, AfterViewInit, OnDestroy, ElementRef, ViewChild } fr
 import { CommonModule } from '@angular/common';
 import { Recipe, Tag } from '../../recipes.model';
 import { RecipeService } from '../../recipes.service';
-import { CarouselComponent } from '../../components/carousel/carousel.component';
 import { RouterModule } from '@angular/router';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,7 +11,6 @@ import { SearchBarComponent } from '../../components/search-bar/search-bar.compo
   selector: 'app-recipe-list',
   standalone: true,
   imports: [
-    CarouselComponent,
     CommonModule,
     RouterModule,
     MatChipsModule,
@@ -25,9 +23,9 @@ import { SearchBarComponent } from '../../components/search-bar/search-bar.compo
 export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
   recipes: Recipe[] = [];
   allTags: Tag[] = [];
+  derivedTags: Tag[] = [];
   filteredRecipes: Recipe[] = [];
   recipeTitles: string[] = [];
-  suggestedRecipes: Recipe[] = [];
   placeholderImage = 'assets/fallback-image.png';
   page = 1;
   loading = false;
@@ -47,14 +45,7 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => console.error('Failed to fetch tags', err)
     });
 
-    this.recipeService.getCarouselSuggestions().subscribe({
-      next: (data) => {
-        this.suggestedRecipes = data;
-      },
-      error: (err) => {
-        console.error(`Failed to get recipe suggestions`, err);
-      }
-    });
+    // No carousel on the landing page for now
   }
 
   ngAfterViewInit(): void {
@@ -76,10 +67,30 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
 
   handleSearch({ term, tags }: { term: string; tags: string[] }) {
     this.lastSearch = { term, tags };
-    this.filteredRecipes = this.recipes.filter(r =>
-      (!term || r.title.toLowerCase().includes(term.toLowerCase())) &&
-      (!tags.length || tags.every(tag => r.tags.includes(tag)))
-    );
+    const raw = term?.toLowerCase() ?? '';
+    const tokens = raw
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    this.filteredRecipes = this.recipes.filter(r => {
+      const tagMatch = (!tags.length) || tags.every(tag => r.tags.includes(tag));
+      if (!raw) return tagMatch; // no text search
+
+      const titleText = r.title.toLowerCase();
+      const ingTexts = (r.ingredients || []).map(ing => `${ing.ingredient?.name || ''} ${ing.amount || ''}`.toLowerCase());
+
+      if (!tokens.length) {
+        // Single token or plain text (no commas)
+        return tagMatch && (titleText.includes(raw) || ingTexts.some(t => t.includes(raw)));
+      }
+
+      // AND match for all tokens across title or any ingredient
+      const allTokensMatch = tokens.every(tok =>
+        titleText.includes(tok) || ingTexts.some(t => t.includes(tok))
+      );
+      return tagMatch && allTokensMatch;
+    });
   }
 
   private loadRecipes() {
@@ -89,6 +100,10 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
       next: data => {
         this.recipes.push(...data.results);
         this.recipeTitles = this.recipes.map(r => r.title);
+        // Fallback tags derived from loaded recipes (if backend tags are empty)
+        const names = new Set<string>();
+        this.recipes.forEach(r => r.tags?.forEach(t => names.add(t)));
+        this.derivedTags = Array.from(names).sort().map((name, idx) => ({ id: idx, name } as Tag));
         this.hasMore = !!data.next;
         this.page++;
         this.loading = false;
@@ -99,5 +114,14 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
         this.loading = false;
       }
     });
+  }
+
+  // Convert HH:MM:SS to total minutes
+  minutes(duration: string | undefined | null): string {
+    if (!duration) return '';
+    const parts = duration.split(':').map(p => parseInt(p || '0', 10));
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return '';
+    const total = parts[0] * 60 + parts[1];
+    return String(total);
   }
 }

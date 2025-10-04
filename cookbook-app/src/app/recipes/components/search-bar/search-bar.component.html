@@ -4,7 +4,7 @@
     <input
       class="search-input"
       type="text"
-      placeholder="Search recipes, ingredients, or tags..."
+      placeholder="Search recipes or ingredients..."
       [(ngModel)]="term"
       (ngModelChange)="emitSearch()"
       [matAutocomplete]="auto"
@@ -18,15 +18,17 @@
 
   <div class="filters-row">
     <span class="filter-label">Filter by tags</span>
-    <mat-chip-set class="tags">
-      <mat-chip
-        *ngFor="let tag of availableTags"
-        [class.selected]="isSelected(tag.name)"
-        (click)="toggleTag(tag.name)"
-      >
-        {{ tag.name }}
-      </mat-chip>
-    </mat-chip-set>
+    <div class="chips-row">
+      <mat-chip-set class="tags">
+        <mat-chip
+          *ngFor="let tag of availableTags"
+          [class.selected]="isSelected(tag.name)"
+          (click)="toggleTag(tag.name)"
+        >
+          {{ tag.name }}
+        </mat-chip>
+      </mat-chip-set>
+    </div>
   </div>
 
   <div class="active-tags" *ngIf="selectedTags.length">

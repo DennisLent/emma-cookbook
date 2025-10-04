@@ -1,13 +1,13 @@
-<section class="recipe-suggestions container">
-  <app-carousel [recipes]="suggestedRecipes"></app-carousel>
-  </section>
-
 <section class="recipes-container container">
   <app-search-bar
-    [availableTags]="allTags"
+    [availableTags]="allTags.length ? allTags : derivedTags"
     [recipeTitles]="recipeTitles"
     (search)="handleSearch($event)">
   </app-search-bar>
+
+  <div class="count-row" *ngIf="recipes.length">
+    {{ filteredRecipes.length }} recipes
+  </div>
 
   <div class="recipe-grid">
     <a class="recipe-card card" *ngFor="let recipe of filteredRecipes" [routerLink]="['/recipes', recipe.id]">
@@ -16,10 +16,9 @@
       </div>
       <div class="content">
         <h3 class="title">{{ recipe.title }}</h3>
-        <p class="desc" *ngIf="recipe.description">{{ recipe.description }}</p>
         <div class="meta">
           <span *ngIf="recipe.cook_time">
-            <mat-icon>timer</mat-icon> {{ recipe.cook_time | slice:3:5 }} min
+            <mat-icon>timer</mat-icon> {{ minutes(recipe.cook_time) }} min
           </span>
           <span *ngIf="recipe.servings">
             <mat-icon>group</mat-icon> {{ recipe.servings }} servings
