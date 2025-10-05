@@ -132,6 +132,11 @@ export class AuthService {
     return this.http.patch(`${environment.apiUrl}/users/me/`, formData);
   }
 
+  // JSON-based partial update (for preferences, theme, layout)
+  updateCurrentUserJson(body: any) {
+    return this.http.patch(`${environment.apiUrl}/users/me/`, body);
+  }
+
   // Helpers for JWT mode
   saveTokens(tokens: { access: string; refresh: string }) {
     localStorage.setItem('access_token', tokens.access);

@@ -8,6 +8,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import {MatDividerModule} from '@angular/material/divider';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../auth/auth.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 
 @Component({
   selector: 'app-header',
@@ -21,6 +22,7 @@ import { AuthService } from '../../auth/auth.service';
     MatMenuModule,
     MatDividerModule,
     RouterModule,
+    TranslatePipe,
   ],
   templateUrl: './header.component.html',
   styleUrl: './header.component.scss'

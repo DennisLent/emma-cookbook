@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 
 import { AuthService } from '../../auth.service';
+import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 
 @Component({
   standalone: true,
@@ -19,7 +20,8 @@ import { AuthService } from '../../auth.service';
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    TranslatePipe
   ],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.scss']
@@ -40,7 +42,7 @@ export class ProfileComponent implements OnInit {
         this.updatedUser = { ...data };
       },
       error: () => {
-        this.error = 'Failed to load user data';
+        this.error = 'profile.failedLoad';
       }
     });
   }
@@ -70,7 +72,7 @@ export class ProfileComponent implements OnInit {
 
     this.authService.updateCurrentUser(formData).subscribe({
       next: () => this.success = true,
-      error: () => this.error = 'Failed to update profile'
+      error: () => this.error = 'profile.failedUpdate'
     });
   }
 }

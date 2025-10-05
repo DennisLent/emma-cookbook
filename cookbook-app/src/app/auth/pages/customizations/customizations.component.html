@@ -1,0 +1,88 @@
+<div class="customizations-container" *ngIf="!loading; else loadingTpl">
+  <mat-card class="segmented-card">
+    <div class="card-header">
+      <mat-button-toggle-group [value]="section" (change)="setSection($event.value)" class="segments" name="segments">
+        <mat-button-toggle value="language">
+          <mat-icon>translate</mat-icon>
+          <span>{{ 'customizations.language' | t }}</span>
+        </mat-button-toggle>
+        <mat-button-toggle value="style">
+          <mat-icon>palette</mat-icon>
+          <span>{{ 'customizations.style' | t }}</span>
+        </mat-button-toggle>
+        <mat-button-toggle value="recipes">
+          <mat-icon>view_module</mat-icon>
+          <span>{{ 'customizations.recipes' | t }}</span>
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <mat-card-content>
+      <div class="status">
+        <span class="success" *ngIf="success">{{ success }}</span>
+        <span class="error" *ngIf="error">{{ error }}</span>
+      </div>
+
+      <!-- Language section -->
+      <div *ngIf="section === 'language'" class="section">
+        <h3>{{ 'customizations.chooseLanguage' | t }}</h3>
+        <mat-radio-group [(ngModel)]="preferences.language" aria-label="Language">
+          <mat-radio-button *ngFor="let lang of languages" [value]="lang.code" class="lang-option">
+            {{ lang.label }} ({{ lang.code }})
+          </mat-radio-button>
+        </mat-radio-group>
+        <div class="actions">
+          <button mat-flat-button color="primary" (click)="saveLanguage()" [disabled]="saving">
+            <mat-icon>save</mat-icon>
+            {{ 'customizations.saveLanguage' | t }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Style section -->
+      <div *ngIf="section === 'style'" class="section">
+        <h3>{{ 'customizations.customizeColors' | t }}</h3>
+        <div class="color-row">
+          <label>{{ 'customizations.mainColor' | t }}</label>
+          <input type="color" [(ngModel)]="theme.mainColor" />
+          <input matInput [(ngModel)]="theme.mainColor" />
+        </div>
+        <div class="color-row">
+          <label>{{ 'customizations.background' | t }}</label>
+          <input type="color" [(ngModel)]="theme.backgroundColor" />
+          <input matInput [(ngModel)]="theme.backgroundColor" />
+        </div>
+        <div class="color-row">
+          <label>{{ 'customizations.accent' | t }}</label>
+          <input type="color" [(ngModel)]="theme.accentColor" />
+          <input matInput [(ngModel)]="theme.accentColor" />
+        </div>
+        <div class="actions">
+          <button mat-flat-button color="primary" (click)="saveStyle()" [disabled]="saving">
+            <mat-icon>save</mat-icon>
+            {{ 'customizations.saveStyle' | t }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Recipes section -->
+      <div *ngIf="section === 'recipes'" class="section">
+        <h3>{{ 'customizations.recipeLayout' | t }}</h3>
+        <mat-radio-group [(ngModel)]="layout.recipeView" aria-label="Recipe layout">
+          <mat-radio-button value="grid">{{ 'customizations.grid' | t }}</mat-radio-button>
+          <mat-radio-button value="list">{{ 'customizations.list' | t }}</mat-radio-button>
+        </mat-radio-group>
+        <div class="actions">
+          <button mat-flat-button color="primary" (click)="saveRecipes()" [disabled]="saving">
+            <mat-icon>save</mat-icon>
+            {{ 'customizations.saveLayout' | t }}
+          </button>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<ng-template #loadingTpl>
+  <div class="loading">{{ 'customizations.loading' | t }}</div>
+  </ng-template>

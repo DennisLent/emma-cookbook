@@ -5,6 +5,7 @@ import { LoginComponent } from './auth/pages/login/login.component';
 import { RegisterComponent } from './auth/pages/register/register.component';
 import { AuthGuard } from './auth/auth,guard';
 import { ProfileComponent } from './auth/pages/profile/profile.component';
+import { CustomizationsComponent } from './auth/pages/customizations/customizations.component';
 import { AddRecipeComponent } from './recipes/pages/recipe-add/recipe-add.component';
 
 export const routes: Routes = [
@@ -22,6 +23,9 @@ export const routes: Routes = [
   },
   {
     path: 'profile', component: ProfileComponent, canActivate: [AuthGuard]
+  },
+  {
+    path: 'customizations', component: CustomizationsComponent, canActivate: [AuthGuard]
   },
   {
     path: 'add', component: AddRecipeComponent, canActivate: [AuthGuard]

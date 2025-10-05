@@ -41,6 +41,10 @@
 
   /* Focus outline */
   --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
+
+  /* Bridge to MDC tokens used by Angular Material */
+  --mdc-theme-primary: var(--color-primary);
+  --mdc-theme-on-primary: #fff;
 }
 
 /* Optional dark theme scaffold (not wired yet) */

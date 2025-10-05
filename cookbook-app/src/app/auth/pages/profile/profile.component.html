@@ -1,15 +1,15 @@
 <div class="profile-container">
   <mat-card class="profile-card">
     <mat-card-header class="profile-header">
-      <mat-card-title>Your Profile</mat-card-title>
-      <mat-card-subtitle>Manage your account information</mat-card-subtitle>
+      <mat-card-title>{{ 'profile.title' | t }}</mat-card-title>
+      <mat-card-subtitle>{{ 'profile.subtitle' | t }}</mat-card-subtitle>
     </mat-card-header>
 
     <mat-card-content>
       <!-- Status messages -->
       <div class="status-messages">
-        <p class="error"   *ngIf="error">{{ error }}</p>
-        <p class="success" *ngIf="success">Profile updated!</p>
+        <p class="error"   *ngIf="error">{{ error | t }}</p>
+        <p class="success" *ngIf="success">{{ 'profile.updated' | t }}</p>
       </div>
 
       <div class="profile-grid">
@@ -22,7 +22,7 @@
               user.avatar ||
               'assets/fallback-avatar.png'
             "
-            alt="Your avatar"
+            alt="{{ 'profile.avatarAlt' | t }}"
           />
           <input
             #avatarInput
@@ -37,7 +37,7 @@
             (click)="avatarInput.click()"
           >
             <mat-icon>photo_camera</mat-icon>
-            Change Avatar
+            {{ 'profile.changeAvatar' | t }}
           </button>
         </div>
 
@@ -49,7 +49,7 @@
         >
           <!-- Username (read-only) -->
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Username</mat-label>
+            <mat-label>{{ 'profile.username' | t }}</mat-label>
             <input
               matInput
               [value]="user.username"
@@ -59,7 +59,7 @@
 
           <!-- First Name -->
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>First Name</mat-label>
+            <mat-label>{{ 'profile.firstName' | t }}</mat-label>
             <input
               matInput
               name="first_name"
@@ -70,7 +70,7 @@
 
           <!-- Last Name -->
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Last Name</mat-label>
+            <mat-label>{{ 'profile.lastName' | t }}</mat-label>
             <input
               matInput
               name="last_name"
@@ -81,7 +81,7 @@
 
           <!-- Bio -->
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Bio</mat-label>
+            <mat-label>{{ 'profile.bio' | t }}</mat-label>
             <textarea
               matInput
               name="bio"
@@ -99,7 +99,7 @@
             type="submit"
           >
             <mat-icon>save</mat-icon>
-            Save Changes
+            {{ 'profile.save' | t }}
           </button>
         </form>
       </div>

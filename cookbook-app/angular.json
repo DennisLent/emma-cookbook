@@ -51,15 +51,26 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "optimization": {
+                "fonts": { "inline": false }
+              }
             },
             "development": {
-              "optimization": false,
+              "optimization": {
+                "scripts": false,
+                "styles": false,
+                "fonts": { "inline": false }
+              },
               "extractLicenses": false,
               "sourceMap": true
             },
             "keycloak": {
-              "optimization": false,
+              "optimization": {
+                "scripts": false,
+                "styles": false,
+                "fonts": { "inline": false }
+              },
               "extractLicenses": false,
               "sourceMap": true,
               "fileReplacements": [

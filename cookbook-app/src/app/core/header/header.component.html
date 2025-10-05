@@ -25,29 +25,29 @@
 
     <a mat-button routerLink="">
       <div class="button-label">
-        <ng-icon name="ionBook" size="20" class="external-icon">Recipes</ng-icon>
-        Recipes
+        <ng-icon name="ionBook" size="20" class="external-icon">{{ 'header.recipes' | t }}</ng-icon>
+        {{ 'header.recipes' | t }}
       </div> 
     </a>
 
     <a mat-button routerLink="/add">
       <div class="button-label">
-        <ng-icon name="ionAddCircle" size="20" class="external-icon">Add New Recipe</ng-icon>
-        Add New Recipe
+        <ng-icon name="ionAddCircle" size="20" class="external-icon">{{ 'header.addRecipe' | t }}</ng-icon>
+        {{ 'header.addRecipe' | t }}
       </div> 
     </a>
 
     <a mat-button routerLink="/plan">
       <div class="button-label">
-        <ng-icon name="ionAnalytics" size="20" class="external-icon">Generate Meal Plan</ng-icon>
-        Generate Meal Plan
+        <ng-icon name="ionAnalytics" size="20" class="external-icon">{{ 'header.generatePlan' | t }}</ng-icon>
+        {{ 'header.generatePlan' | t }}
       </div> 
     </a>
 
     <a mat-button routerLink="/suggest">
       <div class="button-label">
-        <ng-icon name="ionReceipt" size="20" class="external-icon">Suggest a Recipe</ng-icon>
-        Suggest a Recipe
+        <ng-icon name="ionReceipt" size="20" class="external-icon">{{ 'header.suggestRecipe' | t }}</ng-icon>
+        {{ 'header.suggestRecipe' | t }}
       </div> 
     </a>
   </ng-container>
@@ -62,11 +62,15 @@
     <mat-menu #userMenu="matMenu">
       <button mat-menu-item routerLink="/profile">
         <mat-icon>person</mat-icon>
-        <span>Profile</span>
+        <span>{{ 'header.profile' | t }}</span>
+      </button>
+      <button mat-menu-item routerLink="/customizations">
+        <mat-icon>tune</mat-icon>
+        <span>{{ 'header.customizations' | t }}</span>
       </button>
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>
-        <span>Logout</span>
+        <span>{{ 'header.logout' | t }}</span>
       </button>
     </mat-menu>
   </ng-container>

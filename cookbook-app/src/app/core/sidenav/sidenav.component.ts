@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { NgIconsModule } from '@ng-icons/core';
+import { TranslatePipe } from '../i18n/translate.pipe';
 
 
 @Component({
@@ -16,7 +17,8 @@ import { NgIconsModule } from '@ng-icons/core';
     RouterModule,
     MatListModule,
     MatIconModule,
-    NgIconsModule
+    NgIconsModule,
+    TranslatePipe
   ]
 })
 export class SidenavComponent {}

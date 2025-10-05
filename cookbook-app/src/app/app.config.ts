@@ -6,6 +6,8 @@ import { provideIcons } from '@ng-icons/core';
 import { ionLogoGithub, ionLogoLinkedin, ionHome, ionAddCircle, ionBook, ionAnalytics, ionReceipt } from '@ng-icons/ionicons';
 import { AuthInterceptor } from './auth/auth.interceptor';
 import { provideKeycloakInit } from './keycloak-init';
+import { APP_INITIALIZER } from '@angular/core';
+import { TranslateService } from './core/i18n/translate.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -13,6 +15,12 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(withInterceptors([AuthInterceptor])),
     ...provideKeycloakInit,
+    {
+      provide: APP_INITIALIZER,
+      multi: true,
+      deps: [TranslateService],
+      useFactory: (i18n: TranslateService) => () => i18n.init(),
+    },
     provideIcons({
       ionLogoGithub,
       ionLogoLinkedin,
