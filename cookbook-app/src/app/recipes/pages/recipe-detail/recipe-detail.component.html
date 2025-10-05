@@ -10,7 +10,12 @@
 
 <!-- header + meta -->
 <section *ngIf="recipe" class="container header-block">
-  <h1 class="title">{{ recipe.title }}</h1>
+  <h1 class="title">
+    {{ recipe.title }}
+    <button *ngIf="isLoggedIn()" mat-icon-button (click)="toggleFavorite()" aria-label="Favorite" style="margin-left: 8px; vertical-align: middle;">
+      <mat-icon color="warn">{{ recipe?.is_favorited ? 'favorite' : 'favorite_border' }}</mat-icon>
+    </button>
+  </h1>
   <p class="subtitle" *ngIf="recipe.description">{{ recipe.description }}</p>
 
   <div class="chip-row" *ngIf="recipe.tags.length">
@@ -45,8 +50,37 @@
   </div>
 </section>
 
-<!-- Comments Section -->
+<!-- Feedback Section (Rating + Comment) -->
 <section class="container comments-section" *ngIf="recipe">
+  <h3>Feedback</h3>
+
+  <!-- Rating stars -->
+  <div *ngIf="isLoggedIn()" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
+    <span>Rate:</span>
+    <button mat-icon-button *ngFor="let s of [1,2,3,4,5]" (click)="setRating(s)" [attr.aria-label]="'Rate ' + s">
+      <mat-icon color="warn">{{ ratingInput >= s ? 'star' : 'star_border' }}</mat-icon>
+    </button>
+    <span *ngIf="recipe?.avg_rating != null" style="color: var(--color-muted); font-size: 13px;">Avg: {{ recipe?.avg_rating | number:'1.1-1' }}</span>
+  </div>
+
+  <!-- Comment box -->
+  <div *ngIf="isLoggedIn()" style="margin: 8px 0 16px;">
+    <mat-form-field appearance="outline" style="width: 100%;">
+      <mat-label>Add a comment</mat-label>
+      <textarea matInput rows="3" [(ngModel)]="commentInput" placeholder="Share your thoughts or tips..."></textarea>
+    </mat-form-field>
+    <button mat-flat-button color="primary" (click)="submitFeedback()">
+      <mat-icon>send</mat-icon>
+      Submit
+    </button>
+  </div>
+
+  <div *ngIf="!isLoggedIn()" style="margin: 12px 0; color: var(--color-muted);">
+    Sign in to rate and comment.
+  </div>
+
+  <mat-divider style="margin: 16px 0;"></mat-divider>
+
   <h3>Comments</h3>
   <ng-container *ngIf="recipe?.comments?.length; else noComments">
     <div class="comment" *ngFor="let c of recipe!.comments">

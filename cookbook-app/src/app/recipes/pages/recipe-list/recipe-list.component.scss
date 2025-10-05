@@ -11,7 +11,12 @@
   margin-top: 8px;
   color: var(--color-muted);
   font-size: 14px;
+  display: flex;
+  align-items: center;
 }
+
+.count-row .spacer { flex: 1; }
+.sort-field { width: 220px; }
 
 .recipe-card {
   display: flex;
@@ -32,6 +37,9 @@
     border-top-left-radius: inherit;
     border-top-right-radius: inherit;
   }
+
+  .media { position: relative; }
+  .favorite-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.7); border-radius: 999px; }
 
   .content { padding: 14px 16px 16px; }
   .title { margin: 0 0 var(--space-2); font-size: var(--fs-lg); font-weight: var(--fw-semibold); }

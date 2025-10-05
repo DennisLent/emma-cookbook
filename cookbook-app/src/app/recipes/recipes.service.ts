@@ -21,8 +21,12 @@ export class RecipeService {
     return this.http.get<Recipe[]>(this.baseUrl + '/');
   }
 
-  getRecipesPage(page: number): Observable<PaginatedRecipes> {
-    return this.http.get<PaginatedRecipes>(`${this.baseUrl}/?page=${page}`);
+  getRecipesPage(page: number, opts?: { sort?: 'rating' | 'favorites'; direction?: 'asc' | 'desc' }): Observable<PaginatedRecipes> {
+    const params: string[] = [`page=${page}`];
+    if (opts?.sort) params.push(`sort=${opts.sort}`);
+    if (opts?.direction) params.push(`direction=${opts.direction}`);
+    const qs = params.join('&');
+    return this.http.get<PaginatedRecipes>(`${this.baseUrl}/?${qs}`);
   }
 
   getById(id: number): Observable<Recipe> {
@@ -51,5 +55,24 @@ export class RecipeService {
 
   createRecipe(formData: FormData): Observable<Recipe> {
     return this.http.post<Recipe>(`${this.baseUrl}/`, formData);
+  }
+
+  // Favorites
+  favoriteRecipe(id: number): Observable<{ is_favorited: boolean; favorites_count: number }> {
+    return this.http.post<{ is_favorited: boolean; favorites_count: number }>(`${this.baseUrl}/${id}/favorite/`, {});
+    }
+
+  unfavoriteRecipe(id: number): Observable<{ is_favorited: boolean; favorites_count: number }> {
+    return this.http.delete<{ is_favorited: boolean; favorites_count: number }>(`${this.baseUrl}/${id}/favorite/`);
+  }
+
+  // Ratings
+  rateRecipe(id: number, stars: number): Observable<{ my_rating: number; avg_rating: number | null }> {
+    return this.http.post<{ my_rating: number; avg_rating: number | null }>(`${this.baseUrl}/${id}/rate/`, { stars });
+  }
+
+  // Comments
+  addComment(recipeId: number, text: string): Observable<any> {
+    return this.http.post(`${environment.apiUrl}/comments/`, { recipe: recipeId, text });
   }
 }

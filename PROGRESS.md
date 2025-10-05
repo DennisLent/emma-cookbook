@@ -36,10 +36,11 @@ Legend: [x] completed, [ ] not yet
 - [ ] Servings scaling for ingredients
 
 ## Social & Sharing
-- [ ] Ratings (UI)
-- [ ] Favorites (UI)
+- [x] Ratings (UI)
+- [x] Favorites (UI)
 - [x] Comments (display in detail view)
-- [ ] Comment create/edit/delete (UI)
+- [x] Comment create (UI)
+- [ ] Comment edit/delete (UI)
 - [ ] Share actions (Web Share API, WhatsApp deep link)
 
 ## Personalization & Settings

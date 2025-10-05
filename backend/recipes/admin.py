@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Recipe, Tag, Ingredient, RecipeIngredient, Rating, Comment
+from .models import Recipe, Tag, Ingredient, RecipeIngredient, Rating, Comment, Favorite
 
 class RecipeIngredientInline(admin.TabularInline):
     model = RecipeIngredient
@@ -33,3 +33,8 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ('recipe', 'user', 'created_at')
     search_fields = ('text',)
     list_filter = ('created_at',)
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ('recipe', 'user', 'created_at')

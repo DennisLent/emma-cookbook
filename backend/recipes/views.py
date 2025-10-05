@@ -3,7 +3,7 @@ from .models import Recipe, Tag, Rating, Comment, Ingredient
 from .serializers import RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
 from users.models import User
 import random
-from django.db.models import Avg
+from django.db.models import Avg, Count
 from django.db import transaction
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -38,6 +38,28 @@ class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all().order_by('-created_at')
     serializer_class = RecipeSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+
+        sort = request.query_params.get('sort')
+        direction = request.query_params.get('direction', 'desc')
+        dir_prefix = '-' if direction == 'desc' else ''
+
+        # Only allow sorting for authenticated users
+        if request.user and request.user.is_authenticated and sort in ('rating', 'favorites'):
+            if sort == 'rating':
+                qs = Recipe.objects.annotate(avg_rating=Avg('ratings__stars')).order_by(f"{dir_prefix}avg_rating", '-created_at')
+            elif sort == 'favorites':
+                qs = Recipe.objects.annotate(fav_count=Count('favorites', distinct=True)).order_by(f"{dir_prefix}fav_count", '-created_at')
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
 
@@ -200,6 +222,56 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         return Response(data)
 
+    @action(detail=True, methods=['post', 'delete', 'get'], url_path='favorite', permission_classes=[permissions.IsAuthenticated])
+    def favorite(self, request, pk=None):
+        """Favorite/unfavorite a recipe for the current user, or fetch status."""
+        recipe = self.get_object()
+        user = request.user
+
+        if request.method == 'GET':
+            is_favorited = recipe.favorites.filter(user=user).exists()
+            return Response({
+                'is_favorited': is_favorited,
+                'favorites_count': recipe.favorites.count(),
+            })
+
+        if request.method == 'POST':
+            recipe.favorites.get_or_create(user=user)
+            return Response({
+                'is_favorited': True,
+                'favorites_count': recipe.favorites.count(),
+            }, status=status.HTTP_200_OK)
+
+        # DELETE
+        recipe.favorites.filter(user=user).delete()
+        return Response({
+            'is_favorited': False,
+            'favorites_count': recipe.favorites.count(),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='rate', permission_classes=[permissions.IsAuthenticated])
+    def rate(self, request, pk=None):
+        """Create or update the current user's rating for this recipe."""
+        recipe = self.get_object()
+        user = request.user
+        try:
+            stars = int(request.data.get('stars'))
+        except Exception:
+            return Response({"detail": "Missing or invalid 'stars' (1-5)"}, status=status.HTTP_400_BAD_REQUEST)
+        if not (1 <= stars <= 5):
+            return Response({"detail": "'stars' must be between 1 and 5"}, status=status.HTTP_400_BAD_REQUEST)
+
+        rating, _created = Rating.objects.get_or_create(recipe=recipe, user=user, defaults={'stars': stars})
+        if not _created:
+            rating.stars = stars
+            rating.save()
+
+        avg = Recipe.objects.filter(pk=recipe.pk).aggregate(avg=Avg('ratings__stars')).get('avg')
+        return Response({
+            'my_rating': rating.stars,
+            'avg_rating': avg,
+        }, status=status.HTTP_200_OK)
+
 class IngredientViewSet(viewsets.ModelViewSet):
     """
     Anyone can list/retrieve tags.
@@ -243,4 +315,4 @@ class CommentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        serializer.save(user=self.request.user)

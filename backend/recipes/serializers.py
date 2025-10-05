@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Recipe, Tag, Rating, Comment, Ingredient, RecipeIngredient
+from django.db.models import Avg
 from users.models import User
 
 class TagSerializer(serializers.ModelSerializer):
@@ -87,6 +88,12 @@ class RecipeSerializer(serializers.ModelSerializer):
     comments = CommentSerializer(many=True, read_only=True)
     ratings  = RatingSerializer(many=True, read_only=True)
 
+    # Favorites & ratings derived fields
+    favorites_count = serializers.SerializerMethodField()
+    is_favorited = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+    my_rating = serializers.SerializerMethodField()
+
     # nested read
     ingredients = RecipeIngredientSerializer(
         source='recipeingredient_set',
@@ -113,7 +120,11 @@ class RecipeSerializer(serializers.ModelSerializer):
             'cuisine', 'course', 'difficulty', 'calories', 'nutrition',
             'equipment', 'notes', 'video_url',
             'comments',
-            'ratings'
+            'ratings',
+            'favorites_count',
+            'is_favorited',
+            'avg_rating',
+            'my_rating',
         ]
 
     def create(self, validated_data):
@@ -164,3 +175,28 @@ class RecipeSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+    def get_favorites_count(self, obj) -> int:
+        try:
+            return obj.favorites.count()
+        except Exception:
+            return 0
+
+    def get_is_favorited(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        return obj.favorites.filter(user=user).exists()
+
+    def get_avg_rating(self, obj):
+        agg = obj.ratings.aggregate(avg=Avg('stars'))
+        return agg.get('avg')
+
+    def get_my_rating(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not getattr(user, 'is_authenticated', False):
+            return None
+        r = obj.ratings.filter(user=user).first()
+        return r.stars if r else None

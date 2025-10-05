@@ -2,10 +2,14 @@ import { Component, OnInit, AfterViewInit, OnDestroy, ElementRef, ViewChild } fr
 import { CommonModule } from '@angular/common';
 import { Recipe, Tag } from '../../recipes.model';
 import { RecipeService } from '../../recipes.service';
+import { AuthService } from '../../../auth/auth.service';
 import { RouterModule } from '@angular/router';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 import { SearchBarComponent } from '../../components/search-bar/search-bar.component';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
 
 @Component({
   selector: 'app-recipe-list',
@@ -15,6 +19,9 @@ import { SearchBarComponent } from '../../components/search-bar/search-bar.compo
     RouterModule,
     MatChipsModule,
     MatIconModule,
+    MatSelectModule,
+    MatFormFieldModule,
+    MatButtonModule,
     SearchBarComponent
   ],
   templateUrl: './recipe-list.component.html',
@@ -33,9 +40,12 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
   lastSearch = { term: '', tags: [] as string[] };
   private observer?: IntersectionObserver;
 
+  // Sorting
+  sortChoice: 'rating_desc' | 'rating_asc' | 'favorites_desc' | 'favorites_asc' | '' = '';
+
   @ViewChild('anchor', { static: false }) anchor?: ElementRef<HTMLElement>;
 
-  constructor(private recipeService: RecipeService) {}
+  constructor(private recipeService: RecipeService, private auth: AuthService) {}
 
   ngOnInit(): void {
     this.loadRecipes();
@@ -96,7 +106,8 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
   private loadRecipes() {
     if (this.loading || !this.hasMore) return;
     this.loading = true;
-    this.recipeService.getRecipesPage(this.page).subscribe({
+    const opts = this.sortOptsFromChoice();
+    this.recipeService.getRecipesPage(this.page, opts).subscribe({
       next: data => {
         this.recipes.push(...data.results);
         this.recipeTitles = this.recipes.map(r => r.title);
@@ -123,5 +134,51 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
     if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return '';
     const total = parts[0] * 60 + parts[1];
     return String(total);
+  }
+
+  isLoggedIn(): boolean { return this.auth.isLoggedInSync(); }
+
+  toggleFavorite(e: MouseEvent, recipe: Recipe) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!this.isLoggedIn()) return;
+    if (recipe.is_favorited) {
+      this.recipeService.unfavoriteRecipe(recipe.id).subscribe({
+        next: res => {
+          recipe.is_favorited = res.is_favorited;
+          recipe.favorites_count = res.favorites_count;
+        },
+        error: err => console.error('Unfavorite failed', err)
+      });
+    } else {
+      this.recipeService.favoriteRecipe(recipe.id).subscribe({
+        next: res => {
+          recipe.is_favorited = res.is_favorited;
+          recipe.favorites_count = res.favorites_count;
+        },
+        error: err => console.error('Favorite failed', err)
+      });
+    }
+  }
+
+  onSortChange(choice: string) {
+    this.sortChoice = choice as any;
+    // Reset list and refetch from page 1 with sorting
+    this.page = 1;
+    this.hasMore = true;
+    this.recipes = [];
+    this.filteredRecipes = [];
+    this.loadRecipes();
+  }
+
+  private sortOptsFromChoice(): { sort?: 'rating'|'favorites'; direction?: 'asc'|'desc' } {
+    if (!this.isLoggedIn() || !this.sortChoice) return {};
+    if (this.sortChoice.startsWith('rating')) {
+      return { sort: 'rating', direction: this.sortChoice.endsWith('asc') ? 'asc' : 'desc' };
+    }
+    if (this.sortChoice.startsWith('favorites')) {
+      return { sort: 'favorites', direction: this.sortChoice.endsWith('asc') ? 'asc' : 'desc' };
+    }
+    return {};
   }
 }
