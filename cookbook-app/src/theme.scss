@@ -8,6 +8,7 @@
   --color-border: #E2E8F0;      /* Border */
   --color-primary: #2563EB;     /* Accent */
   --color-primary-hover: #1D4ED8;
+  --color-accent: #ff4081;      /* Secondary accent */
   --color-success: #16A34A;
   --color-warning: #F59E0B;
   --color-danger: #DC2626;
@@ -40,7 +41,7 @@
   --space-6: 32px;
 
   /* Focus outline */
-  --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-accent) 35%, transparent);
 
   /* Bridge to MDC tokens used by Angular Material */
   --mdc-theme-primary: var(--color-primary);

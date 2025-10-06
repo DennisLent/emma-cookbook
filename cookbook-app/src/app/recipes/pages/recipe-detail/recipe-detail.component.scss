@@ -18,6 +18,7 @@
 
 /* Content */
 .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0 24px; }
+.content-grid.single { grid-template-columns: 1fr; }
 .content-grid .col { padding: 16px; }
 .ingredients-list { display: grid; gap: 8px; margin-top: 8px; }
 ol { padding-left: 20px; }

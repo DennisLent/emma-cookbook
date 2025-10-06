@@ -14,6 +14,11 @@ try {
   if (savedTheme) {
     const t = JSON.parse(savedTheme);
     const root = document.documentElement;
+    if (t.mode === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+    } else {
+      root.removeAttribute('data-theme');
+    }
     if (t.mainColor) {
       root.style.setProperty('--color-primary', t.mainColor);
       // crude hover derivation: identical if not computable here
@@ -21,6 +26,9 @@ try {
     }
     if (t.backgroundColor) {
       root.style.setProperty('--color-bg', t.backgroundColor);
+    }
+    if (t.accentColor) {
+      root.style.setProperty('--color-accent', t.accentColor);
     }
   }
 } catch {}

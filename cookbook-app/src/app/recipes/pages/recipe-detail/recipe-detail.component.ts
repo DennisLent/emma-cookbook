@@ -56,6 +56,11 @@ export class RecipeDetailComponent implements OnInit {
   ratingInput: number = 0;
   commentInput: string = '';
 
+  // User layout preference
+  layoutOrder: string[] = ['title','description','meta','ingredients','steps','comments'];
+  renderBlocks: (string | { type: 'grid', blocks: ('ingredients'|'steps')[] })[] = [];
+  detailColumns: 1 | 2 = 2;
+
   constructor(
     private route: ActivatedRoute,
     private recipeService: RecipeService,
@@ -85,6 +90,7 @@ export class RecipeDetailComponent implements OnInit {
         }
 
         this.loading = false;
+        this.computeRenderBlocks();
       },
       error: (err) => {
         console.error('Failed to fetch recipe:', err);
@@ -92,6 +98,41 @@ export class RecipeDetailComponent implements OnInit {
         this.loading = false;
       }
     });
+
+    // Fetch layout preference (best-effort)
+    try {
+      if (this.auth.isLoggedInSync()) {
+        this.auth.getCurrentUser().subscribe({
+          next: (user: any) => {
+            const saved = user?.layout?.recipeDetail as string[] | undefined;
+            if (Array.isArray(saved) && saved.length) this.layoutOrder = [...saved];
+            const cols = (user?.layout?.recipeDetailColumns as 1|2) || this.detailColumns;
+            this.detailColumns = cols;
+            // Fallback to localStorage if missing
+            if (!saved || !saved.length) {
+              const ls = localStorage.getItem('layout_recipe_detail');
+              if (ls) {
+                const arr = JSON.parse(ls);
+                if (Array.isArray(arr)) this.layoutOrder = arr;
+              }
+            }
+            const lsc = localStorage.getItem('layout_recipe_detail_columns');
+            if (lsc) this.detailColumns = (parseInt(lsc,10) === 1 ? 1 : 2);
+            this.computeRenderBlocks();
+          }
+        });
+      } else {
+        // fallback to localStorage if present
+        const ls = localStorage.getItem('layout_recipe_detail');
+        if (ls) {
+          const arr = JSON.parse(ls);
+          if (Array.isArray(arr)) this.layoutOrder = arr;
+          const lsc = localStorage.getItem('layout_recipe_detail_columns');
+          if (lsc) this.detailColumns = (parseInt(lsc,10) === 1 ? 1 : 2);
+          this.computeRenderBlocks();
+        }
+      }
+    } catch {}
   }
 
   isLoggedIn(): boolean { return this.auth.isLoggedInSync(); }
@@ -135,5 +176,40 @@ export class RecipeDetailComponent implements OnInit {
       },
       error: err => console.error('Failed to submit feedback', err)
     });
+  }
+
+  // Layout helpers
+  has(section: string) { return this.layoutOrder.includes(section); }
+  indexOf(section: string) { return this.layoutOrder.indexOf(section); }
+  ingredientsFirst(): boolean {
+    const i = this.indexOf('ingredients');
+    const s = this.indexOf('steps');
+    if (i === -1) return false;
+    if (s === -1) return true;
+    return i <= s;
+  }
+
+  private computeRenderBlocks() {
+    const out: (string | { type: 'grid', blocks: ('ingredients'|'steps')[] })[] = [];
+    const o = this.layoutOrder || [];
+    let i = 0;
+    while (i < o.length) {
+      const cur = o[i];
+      const next = o[i + 1];
+      const isCurIS = cur === 'ingredients' || cur === 'steps';
+      const isNextIS = next === 'ingredients' || next === 'steps';
+      if (this.detailColumns === 2 && isCurIS && isNextIS) {
+        out.push({ type: 'grid', blocks: [cur as any, next as any] });
+        i += 2;
+      } else {
+        out.push(cur);
+        i += 1;
+      }
+    }
+    this.renderBlocks = out;
+  }
+
+  isGrid(b: any): b is { type: 'grid', blocks: ('ingredients'|'steps')[] } {
+    return b && b.type === 'grid';
   }
 }

@@ -1,6 +1,6 @@
 @use 'theme' as *;
 
-html, body { height: 100%; }
+html, body { height: 100vh; }
 body {
   margin: 0;
   font-family: Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -8,6 +8,18 @@ body {
   color: var(--color-text);
   line-height: var(--lh-base);
 }
+
+/* Ensure Angular Material layout containers inherit our background */
+.sidenav-container,
+.sidenav-content,
+mat-sidenav-content,
+.mat-drawer-content {
+  background: var(--color-bg) !important;
+  color: var(--color-text);
+}
+
+/* Overlay container must remain transparent; individual panels use tokens */
+.cdk-overlay-container { background: transparent !important; }
 
 /* Layout helpers */
 .container {
@@ -28,6 +40,12 @@ body {
   --mdc-outlined-text-field-outline-color: var(--color-border);
   --mdc-outlined-text-field-hover-outline-color: var(--color-border);
 }
+
+/* Material surfaces follow our tokens */
+.mat-mdc-card { background: var(--color-surface) !important; color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.mat-mdc-menu-panel, .mat-mdc-select-panel { background: var(--color-surface) !important; color: var(--color-text); border: 1px solid var(--color-border); }
+.mat-mdc-menu-item .mdc-list-item__primary-text { color: var(--color-text); }
+mat-divider, .mat-divider { border-top-color: var(--color-border) !important; }
 
 .mat-mdc-raised-button.mat-primary,
 .mat-mdc-unelevated-button.mat-primary,
@@ -79,14 +97,24 @@ body {
 /* Chips */
 .mat-mdc-chip-set .mdc-evolution-chip--selected,
 .mat-mdc-standard-chip.mat-primary.mdc-evolution-chip--selected {
-  background: var(--color-primary) !important;
+  background: var(--color-accent) !important;
   color: #fff !important;
 }
 
 /* Toolbar primary color driven by CSS vars */
 .mat-toolbar.mat-primary {
   background: var(--color-primary) !important;
-  color: #fff;
+  color: var(--mdc-theme-on-primary);
+}
+
+/* Ensure toolbar contents are readable on primary */
+.mat-toolbar.mat-primary .mat-mdc-button,
+.mat-toolbar.mat-primary .mat-mdc-icon-button,
+.mat-toolbar.mat-primary a,
+.mat-toolbar.mat-primary .mat-icon,
+.mat-toolbar.mat-primary .mdc-button__label {
+  color: var(--mdc-theme-on-primary) !important;
+  fill: var(--mdc-theme-on-primary) !important;
 }
 
 /* Typography scale */
@@ -95,6 +123,10 @@ h2 { font-size: var(--fs-xl);  font-weight: var(--fw-semibold); margin: 0 0 var(
 h3 { font-size: var(--fs-lg);  font-weight: var(--fw-semibold); margin: 0 0 var(--space-2); }
 small, .text-sm { font-size: var(--fs-sm); }
 .text-muted { color: var(--color-muted); }
+
+/* Links */
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: color-mix(in srgb, var(--color-accent) 80%, #000); text-decoration: underline; }
 
 /* Focus styles */
 *:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }

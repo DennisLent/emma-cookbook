@@ -1,10 +1,13 @@
-/* Carousel removed for now */
+.recipes-container .container {
+  height: 100vh;
+}
 
 .recipe-grid {
   margin-top: var(--space-4);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .count-row {
