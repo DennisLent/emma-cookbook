@@ -29,6 +29,7 @@ Legend: [x] completed, [ ] not yet
 - [x] Suggestions carousel (server-provided)
 - [x] Filter by ingredients
 - [ ] Sort by newest/top rated
+  - Note: Top rated / favorites sorting is implemented; "newest" sort pending.
 
 ## Cooking Experience
 - [ ] Cook Mode (distraction‑free stepper, large type)
@@ -48,6 +49,12 @@ Legend: [x] completed, [ ] not yet
 - [x] Accent color picker + site title/logo settings
 - [x] Dark theme toggle
 - [ ] Per‑user preferences (theme, density, accessibility)
+
+### Layout Customization
+- [x] Recipe detail layout builder (1–3 columns, drag & drop, adjustable widths)
+- [x] Persist per‑user layout (server + localStorage)
+- [x] Comments fixed at bottom of recipe detail (not part of customization)
+- [x] i18n language preference applied and persisted
 
 ## Planning & Shopping
 - [ ] Meal planning list (per user)
