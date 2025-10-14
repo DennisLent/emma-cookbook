@@ -32,6 +32,7 @@ export default {
   'customizations.detailColumns': 'Detail columns',
   'customizations.oneColumn': 'One Column',
   'customizations.twoColumns': 'Two Columns',
+  'customizations.threeColumns': 'Three Columns',
   'customizations.block.title': 'Title',
   'customizations.block.description': 'Description',
   'customizations.block.meta': 'Meta',

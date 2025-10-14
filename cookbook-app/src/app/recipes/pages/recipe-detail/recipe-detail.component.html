@@ -2,9 +2,123 @@
 <section *ngIf="loading" class="status"><p>Loading recipe…</p></section>
 <section *ngIf="error" class="status error"><p>{{ error }}</p></section>
 
-<!-- Render all sections in layout order (with grid coalescing) -->
+<!-- Render grid layout if enabled; otherwise list order (with grid coalescing for steps/ingredients) -->
 <ng-container *ngIf="recipe">
-  <ng-container *ngFor="let b of renderBlocks; let idx = index">
+  <!-- Experimental grid layout mode (3-column board) -->
+  <ng-container *ngIf="layoutMode==='grid' && !isMobile && boardCols && (boardCols[0]?.length || boardCols[1]?.length || boardCols[2]?.length); else listLayout">
+    <section class="container content-grid content-board" [style.grid-template-columns]="boardGridTemplate()">
+      <div class="col" *ngFor="let col of boardCols | slice:0:boardColumns; let i = index">
+        <div class="card" style="padding: 16px; margin-bottom: 8px;" *ngFor="let s of col">
+          <ng-container [ngSwitch]="s">
+            <!-- Image -->
+            <ng-container *ngSwitchCase="'image'">
+              <img [src]="recipe.image || placeholderImage" alt="{{ recipe.title }}" style="width:100%; height:auto; display:block; border-radius: var(--radius-md);" />
+            </ng-container>
+            <!-- Title -->
+            <ng-container *ngSwitchCase="'title'">
+              <h1 class="title" style="margin:0 0 8px; font-size: 28px;">
+                {{ recipe.title }}
+                <button *ngIf="isLoggedIn()" mat-icon-button (click)="toggleFavorite()" aria-label="Favorite" style="margin-left: 8px; vertical-align: middle;">
+                  <mat-icon color="warn">{{ recipe?.is_favorited ? 'favorite' : 'favorite_border' }}</mat-icon>
+                </button>
+              </h1>
+            </ng-container>
+            <!-- Description -->
+            <ng-container *ngSwitchCase="'description'">
+              <p class="subtitle" style="margin:0; color: var(--color-muted);">{{ recipe.description }}</p>
+            </ng-container>
+            <!-- Tags -->
+            <ng-container *ngSwitchCase="'tags'">
+              <div class="chip-row">
+                <span class="chip" *ngFor="let tag of recipe.tags">{{ tag }}</span>
+              </div>
+            </ng-container>
+            <!-- Meta -->
+            <ng-container *ngSwitchCase="'meta'">
+              <div class="meta">
+                <span *ngIf="recipe.prep_time"><mat-icon>timer</mat-icon> Prep {{ recipe.prep_time }}</span>
+                <span *ngIf="recipe.cook_time"><mat-icon>restaurant</mat-icon> Cook {{ recipe.cook_time }}</span>
+                <span *ngIf="recipe.servings"><mat-icon>group</mat-icon> Servings {{ recipe.servings }}</span>
+              </div>
+            </ng-container>
+            <!-- Author -->
+            <ng-container *ngSwitchCase="'author'">
+              <div class="meta"><span><mat-icon>person</mat-icon> By {{ recipe.created_by }}</span></div>
+            </ng-container>
+            <!-- Nutrition -->
+            <ng-container *ngSwitchCase="'nutrition'">
+              <h3>Nutrition</h3>
+              <p class="text-muted">Nutrition information coming soon.</p>
+            </ng-container>
+            <!-- Ingredients -->
+            <ng-container *ngSwitchCase="'ingredients'">
+              <h3>Ingredients</h3>
+              <div class="ingredients-list">
+                <mat-checkbox
+                  *ngFor="let ingr of recipe.ingredients; let i = index"
+                  [(ngModel)]="ingredientChecks[i]"
+                >
+                  {{ ingr.amount }} {{ ingr.ingredient.name }}
+                </mat-checkbox>
+              </div>
+            </ng-container>
+            <!-- Steps -->
+            <ng-container *ngSwitchCase="'steps'">
+              <h3>Instructions</h3>
+              <ol>
+                <li *ngFor="let step of instructionsArray">{{ step }}</li>
+              </ol>
+            </ng-container>
+          </ng-container>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comments fixed at bottom in grid mode -->
+    <section class="container comments-section">
+      <h3>Feedback</h3>
+      <div *ngIf="isLoggedIn()" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
+        <span>Rate:</span>
+        <button mat-icon-button *ngFor="let s of [1,2,3,4,5]" (click)="setRating(s)" [attr.aria-label]="'Rate ' + s">
+          <mat-icon color="warn">{{ ratingInput >= s ? 'star' : 'star_border' }}</mat-icon>
+        </button>
+        <span *ngIf="recipe?.avg_rating != null" style="color: var(--color-muted); font-size: 13px;">Avg: {{ recipe?.avg_rating | number:'1.1-1' }}</span>
+      </div>
+      <div *ngIf="isLoggedIn()" style="margin: 8px 0 16px;">
+        <mat-form-field appearance="outline" style="width: 100%;">
+          <mat-label>Add a comment</mat-label>
+          <textarea matInput rows="3" [(ngModel)]="commentInput" placeholder="Share your thoughts or tips..."></textarea>
+        </mat-form-field>
+        <button mat-flat-button color="primary" (click)="submitFeedback()">
+          <mat-icon>send</mat-icon>
+          Submit
+        </button>
+      </div>
+      <div *ngIf="!isLoggedIn()" style="margin: 12px 0; color: var(--color-muted);">
+        Sign in to rate and comment.
+      </div>
+      <mat-divider style="margin: 16px 0;"></mat-divider>
+      <h3>Comments</h3>
+      <ng-container *ngIf="recipe?.comments?.length; else noCommentsBoard">
+        <div class="comment" *ngFor="let c of recipe!.comments">
+          <div class="comment-header">
+            <strong>{{ c.author }}</strong>
+            <span>{{ c.created_at | date:'short' }}</span>
+          </div>
+          <p class="comment-body">{{ c.text }}</p>
+        </div>
+      </ng-container>
+      <ng-template #noCommentsBoard>
+        <div class="no-comments">
+          <img [src]="emptyCommentsImage" alt="No comments" class="no-comments-img" />
+          <p>No comments just yet...</p>
+        </div>
+      </ng-template>
+    </section>
+  </ng-container>
+  <!-- List layout fallback -->
+  <ng-template #listLayout>
+    <ng-container *ngFor="let b of renderBlocks; let idx = index">
     <!-- Hero image -->
     <section *ngIf="!isGrid(b) && b === 'image'" class="hero">
       <img [src]="recipe.image || placeholderImage" alt="{{ recipe.title }}" />
@@ -101,11 +215,13 @@
       </div>
     </section>
 
-    <!-- Comments -->
-    <section *ngIf="!isGrid(b) && b === 'comments'" class="container comments-section">
+    <!-- Comments handled as fixed section at bottom in list mode -->
+    </ng-container>
+  </ng-template>
+  <!-- Fixed comments at bottom for list mode -->
+  <ng-container *ngIf="layoutMode!=='grid' || isMobile">
+    <section class="container comments-section">
       <h3>Feedback</h3>
-
-      <!-- Rating stars -->
       <div *ngIf="isLoggedIn()" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
         <span>Rate:</span>
         <button mat-icon-button *ngFor="let s of [1,2,3,4,5]" (click)="setRating(s)" [attr.aria-label]="'Rate ' + s">
@@ -113,8 +229,6 @@
         </button>
         <span *ngIf="recipe?.avg_rating != null" style="color: var(--color-muted); font-size: 13px;">Avg: {{ recipe?.avg_rating | number:'1.1-1' }}</span>
       </div>
-
-      <!-- Comment box -->
       <div *ngIf="isLoggedIn()" style="margin: 8px 0 16px;">
         <mat-form-field appearance="outline" style="width: 100%;">
           <mat-label>Add a comment</mat-label>
@@ -125,15 +239,10 @@
           Submit
         </button>
       </div>
-
-      <div *ngIf="!isLoggedIn()" style="margin: 12px 0; color: var(--color-muted);">
-        Sign in to rate and comment.
-      </div>
-
+      <div *ngIf="!isLoggedIn()" style="margin: 12px 0; color: var(--color-muted);">Sign in to rate and comment.</div>
       <mat-divider style="margin: 16px 0;"></mat-divider>
-
       <h3>Comments</h3>
-      <ng-container *ngIf="recipe?.comments?.length; else noComments">
+      <ng-container *ngIf="recipe?.comments?.length; else noCommentsList">
         <div class="comment" *ngFor="let c of recipe!.comments">
           <div class="comment-header">
             <strong>{{ c.author }}</strong>
@@ -142,7 +251,7 @@
           <p class="comment-body">{{ c.text }}</p>
         </div>
       </ng-container>
-      <ng-template #noComments>
+      <ng-template #noCommentsList>
         <div class="no-comments">
           <img [src]="emptyCommentsImage" alt="No comments" class="no-comments-img" />
           <p>No comments just yet...</p>
@@ -151,49 +260,3 @@
     </section>
   </ng-container>
 </ng-container>
-  <h3>Feedback</h3>
-
-  <!-- Rating stars -->
-  <div *ngIf="isLoggedIn()" style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
-    <span>Rate:</span>
-    <button mat-icon-button *ngFor="let s of [1,2,3,4,5]" (click)="setRating(s)" [attr.aria-label]="'Rate ' + s">
-      <mat-icon color="warn">{{ ratingInput >= s ? 'star' : 'star_border' }}</mat-icon>
-    </button>
-    <span *ngIf="recipe?.avg_rating != null" style="color: var(--color-muted); font-size: 13px;">Avg: {{ recipe?.avg_rating | number:'1.1-1' }}</span>
-  </div>
-
-  <!-- Comment box -->
-  <div *ngIf="isLoggedIn()" style="margin: 8px 0 16px;">
-    <mat-form-field appearance="outline" style="width: 100%;">
-      <mat-label>Add a comment</mat-label>
-      <textarea matInput rows="3" [(ngModel)]="commentInput" placeholder="Share your thoughts or tips..."></textarea>
-    </mat-form-field>
-    <button mat-flat-button color="primary" (click)="submitFeedback()">
-      <mat-icon>send</mat-icon>
-      Submit
-    </button>
-  </div>
-
-  <div *ngIf="!isLoggedIn()" style="margin: 12px 0; color: var(--color-muted);">
-    Sign in to rate and comment.
-  </div>
-
-  <mat-divider style="margin: 16px 0;"></mat-divider>
-
-  <h3>Comments</h3>
-  <ng-container *ngIf="recipe?.comments?.length; else noComments">
-    <div class="comment" *ngFor="let c of recipe!.comments">
-      <div class="comment-header">
-        <strong>{{ c.author }}</strong>
-        <span>{{ c.created_at | date:'short' }}</span>
-      </div>
-      <p class="comment-body">{{ c.text }}</p>
-    </div>
-  </ng-container>
-  <ng-template #noComments>
-    <div class="no-comments">
-      <img [src]="emptyCommentsImage" alt="No comments" class="no-comments-img" />
-      <p>No comments just yet...</p>
-    </div>
-  </ng-template>
-</section>

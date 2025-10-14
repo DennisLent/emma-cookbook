@@ -45,8 +45,8 @@ Legend: [x] completed, [ ] not yet
 
 ## Personalization & Settings
 - [x] Light theme baseline (CSS variables)
-- [ ] Accent color picker + site title/logo settings
-- [ ] Dark theme toggle
+- [x] Accent color picker + site title/logo settings
+- [x] Dark theme toggle
 - [ ] Per‑user preferences (theme, density, accessibility)
 
 ## Planning & Shopping
