@@ -132,7 +132,7 @@ export class AuthService {
     return this.http.patch(`${environment.apiUrl}/users/me/`, formData);
   }
 
-  // JSON-based partial update (for preferences, theme, layout)
+  // JSON-based partial update (for preferences or theme)
   updateCurrentUserJson(body: any) {
     return this.http.patch(`${environment.apiUrl}/users/me/`, body);
   }

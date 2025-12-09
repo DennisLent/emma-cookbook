@@ -9,10 +9,6 @@
         <mat-icon>palette</mat-icon>
         {{ 'customizations.style' | t }}
       </button>
-      <button class="seg" [class.active]="section==='recipes'" (click)="setSection('recipes')">
-        <mat-icon>view_module</mat-icon>
-        {{ 'customizations.recipes' | t }}
-      </button>
     </div>
 
     <mat-card-content>
@@ -98,81 +94,26 @@
             {{ 'customizations.saveStyle' | t }}
           </button>
         </div>
-      </div>
 
-      <!-- Recipes section -->
-      <div *ngIf="section === 'recipes'" class="section">
-        <h3>{{ 'customizations.recipeLayout' | t }}</h3>
-        <div class="builder card">
-          <div class="color-row toggle-row">
-            <label>{{ 'customizations.detailColumns' | t }}</label>
-            <mat-button-toggle-group class="toggle-group" [(ngModel)]="layout.recipeDetailColumns" (change)="onColumnsChange($event.value)" aria-label="Grid columns">
-              <mat-button-toggle [value]="1">{{ 'customizations.oneColumn' | t }}</mat-button-toggle>
-              <mat-button-toggle [value]="2">{{ 'customizations.twoColumns' | t }}</mat-button-toggle>
-              <mat-button-toggle [value]="3">{{ 'customizations.threeColumns' | t }}</mat-button-toggle>
-            </mat-button-toggle-group>
+        <div class="tags-section card">
+          <div class="tags-head">
+            <h3>Tags</h3>
+            <span class="hint">Create new tags to use on recipes.</span>
           </div>
-          <div class="color-row toggle-row" *ngIf="layout.recipeDetailColumns && layout.recipeDetailColumns > 1">
-            <label>Column widths</label>
-            <div class="width-controls">
-              <ng-container *ngFor="let i of colIndices(); let last = last">
-                <mat-form-field appearance="outline" style="width: 140px; margin-right: 8px;">
-                  <mat-label>Col {{ i + 1 }} (%)</mat-label>
-                  <input matInput type="number"
-                         [disabled]="last"
-                         [ngModel]="boardWidths[i]"
-                         (ngModelChange)="onPercentChange(i, $event)"
-                         min="0" max="100" step="1" />
-                </mat-form-field>
-              </ng-container>
-            </div>
+          <div class="tag-input-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>New tag name</mat-label>
+              <input matInput [(ngModel)]="newTag" />
+            </mat-form-field>
+            <button mat-stroked-button color="primary" (click)="addTag()" [disabled]="!newTag.trim()">
+              <mat-icon>add</mat-icon>
+              Add
+            </button>
           </div>
-
-          <div class="builder-head">{{ 'customizations.builderTitle' | t }}</div>
-          <p class="builder-hint">{{ 'customizations.dragHint' | t }}</p>
-
-          <!-- Grid builder (Kanban board style with up to 3 columns) -->
-            <div class="builder-columns">
-              <div class="builder-col">
-                <div class="builder-label">{{ 'customizations.available' | t }}</div>
-                <div cdkDropList [id]="'availableList'" [cdkDropListConnectedTo]="connectedToAll()" [cdkDropListData]="boardAvailable" (cdkDropListDropped)="dropBoard($event)" class="drop-list">
-                  <div class="item" *ngFor="let s of boardAvailable" cdkDrag>
-                    <mat-icon>drag_indicator</mat-icon>
-                    <span>{{ ('customizations.block.' + s) | t }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="builder-col" style="flex: 2;">
-                <div class="builder-label">Grid</div>
-                <div class="board-grid">
-                  <div class="board-col" *ngFor="let col of boardCols | slice:0:layout.recipeDetailColumns; let i = index"
-                       [style.flex]="colFlex(i)" [style.maxWidth]="colPercent(i) + '%'">
-                    <div class="grid-col-label">Column {{ i + 1 }}</div>
-                    <div cdkDropList [id]="'colList-' + i" [cdkDropListConnectedTo]="connectedToAll()" [cdkDropListData]="boardCols[i]" (cdkDropListDropped)="dropBoard($event)" class="drop-list">
-                      <div class="item" *ngFor="let s of boardCols[i]" cdkDrag>
-                        <mat-icon>drag_indicator</mat-icon>
-                        <span>{{ ('customizations.block.' + s) | t }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="actions" style="margin-top: 4px;">
-                  <span style="color: var(--color-muted); font-size: var(--fs-sm);" *ngIf="!isLayoutValid()">
-                    Missing required: {{ computeMissingRequired().join(', ') }}
-                  </span>
-                </div>
-              </div>
-            </div>
-        </div>
-
-        <div class="actions">
-          <button mat-button (click)="resetLayout()">{{ 'customizations.resetLayout' | t }}</button>
-          <span class="spacer"></span>
-          <button mat-flat-button color="primary" (click)="saveRecipes()" [disabled]="saving || !isLayoutValid()">
-            <mat-icon>save</mat-icon>
-            {{ 'customizations.saveLayout' | t }}
-          </button>
+          <div class="tag-message" *ngIf="tagMessage">{{ tagMessage }}</div>
+          <div class="tag-list">
+            <span class="tag-chip" *ngFor="let tag of tags">{{ tag.name }}</span>
+          </div>
         </div>
       </div>
     </mat-card-content>

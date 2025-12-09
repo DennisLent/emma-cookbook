@@ -1,7 +1,7 @@
 <div class="add-recipe-container container">
   <div class="header">
     <a routerLink="/" class="back"><mat-icon>arrow_back</mat-icon></a>
-    <h2>Add Recipe</h2>
+    <h2>{{ isEditing ? 'Edit Recipe' : 'Add Recipe' }}</h2>
   </div>
 
   <!-- Top segmented tabs -->
@@ -98,7 +98,7 @@
       <button mat-stroked-button type="button" routerLink="/" color="primary">Cancel</button>
       <button mat-flat-button color="primary" [disabled]="recipeForm.invalid" type="submit">
         <mat-icon>save</mat-icon>
-        Save Recipe
+        {{ isEditing ? 'Update Recipe' : 'Save Recipe' }}
       </button>
     </div>
   </form>

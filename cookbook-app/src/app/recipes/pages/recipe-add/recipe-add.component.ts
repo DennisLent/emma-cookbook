@@ -3,7 +3,7 @@ import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
 import { RecipeService } from '../../recipes.service';
-import { Ingredient, Tag } from '../../recipes.model';
+import { Ingredient, Tag, Recipe } from '../../recipes.model';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -11,6 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-recipe-add',
@@ -36,6 +37,8 @@ export class AddRecipeComponent implements OnInit {
   websiteUrl = '';
   isPreviewing = false;
   previewError = '';
+  isEditing = false;
+  recipeId?: number;
 
   tags: Tag[] = [];
 
@@ -46,7 +49,9 @@ export class AddRecipeComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private recipeService: RecipeService
+    private recipeService: RecipeService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   ngOnInit() {
@@ -64,6 +69,13 @@ export class AddRecipeComponent implements OnInit {
       ingredients_data: this.fb.array([]),
       image: [null]
     });
+
+    const idParam = this.route.snapshot.paramMap.get('id');
+    if (idParam) {
+      this.isEditing = true;
+      this.recipeId = Number(idParam);
+      this.loadRecipe(this.recipeId);
+    }
   }
 
   get ingredients(): FormArray {
@@ -113,6 +125,7 @@ export class AddRecipeComponent implements OnInit {
 
   private parseTime(input: string): string {
     if (!input) return '';
+    if (/^\d{2}:\d{2}:\d{2}$/.test(input.trim())) return input.trim();
 
     const hoursMatch = input.match(/(\d+)\s*h/);
     const minsMatch = input.match(/(\d+)\s*m/);
@@ -198,24 +211,75 @@ export class AddRecipeComponent implements OnInit {
 
       fd.append('image', v.image);
 
-      this.recipeService.createRecipe(fd).subscribe({
-        next: () => alert('Recipe created!'),
+      const action$ = this.isEditing && this.recipeId
+        ? this.recipeService.updateRecipe(this.recipeId, fd)
+        : this.recipeService.createRecipe(fd);
+
+      action$.subscribe({
+        next: (recipe) => {
+          alert(this.isEditing ? 'Recipe updated!' : 'Recipe created!');
+          this.router.navigate(['/recipes', recipe.id]);
+        },
         error: err => {
-          console.error('[Recipe Create Error]', err);
+          console.error('[Recipe Save Error]', err);
           alert('Failed to save recipe: ' + (err.error?.detail || err.message));
         }
       });
 
     } else {
 
-      this.recipeService.createRecipe(baseData).subscribe({
-        next: () => alert('Recipe created!'),
+      const action$ = this.isEditing && this.recipeId
+        ? this.recipeService.updateRecipe(this.recipeId, baseData)
+        : this.recipeService.createRecipe(baseData);
+
+      action$.subscribe({
+        next: (recipe) => {
+          alert(this.isEditing ? 'Recipe updated!' : 'Recipe created!');
+          this.router.navigate(['/recipes', recipe.id]);
+        },
         error: err => {
           console.error('[Recipe Create Error]', err);
           alert('Failed to save recipe: ' + (err.error?.detail || err.message));
         }
       });
     }
+  }
+
+  private loadRecipe(id: number) {
+    this.recipeService.getById(id).subscribe({
+      next: (recipe: Recipe) => this.populateFormFromRecipe(recipe),
+      error: err => {
+        console.error('Failed to load recipe', err);
+        this.router.navigate(['/recipes', id]);
+      }
+    });
+  }
+
+  private populateFormFromRecipe(recipe: Recipe) {
+    this.recipeForm.patchValue({
+      title: recipe.title,
+      description: recipe.description,
+      instructions: recipe.instructions,
+      tags: recipe.tags || [],
+      servings: recipe.servings,
+      prep_time: recipe.prep_time,
+      cook_time: recipe.cook_time,
+      total_time: recipe.total_time,
+      image: null
+    });
+
+    this.ingredients.clear();
+    if (Array.isArray(recipe.ingredients)) {
+      recipe.ingredients.forEach(ing => {
+        this.ingredients.push(
+          this.fb.group({
+            ingredient: [ing.ingredient?.name || '', Validators.required],
+            amount: [ing.amount || '', Validators.required]
+          })
+        );
+      });
+    }
+    if (!this.ingredients.length) this.addIngredient();
   }
 
 }

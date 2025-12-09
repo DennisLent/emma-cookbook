@@ -53,6 +53,22 @@ export class RecipeService {
     return this.http.post<Recipe>(`${this.baseUrl}/preview/youtube/`, { video_url });
   }
 
+  generatePlan(dietType: string, days: number, mealsPerDay: number): Observable<{ plan: Recipe[][] }> {
+    return this.http.post<{ plan: Recipe[][] }>(`${this.baseUrl}/plan/`, {
+      diet_type: dietType,
+      days,
+      meals_per_day: mealsPerDay
+    });
+  }
+
+  swapRecipeInPlan(dietType: string, currentRecipeId: number, existingPlanIds: number[]): Observable<Recipe> {
+    return this.http.post<Recipe>(`${this.baseUrl}/swap/`, {
+      diet_type: dietType,
+      current_recipe_id: currentRecipeId,
+      existing_plan_ids: existingPlanIds
+    });
+  }
+
   createRecipe(formData: FormData): Observable<Recipe> {
     return this.http.post<Recipe>(`${this.baseUrl}/`, formData);
   }
@@ -69,6 +85,16 @@ export class RecipeService {
   // Ratings
   rateRecipe(id: number, stars: number): Observable<{ my_rating: number; avg_rating: number | null }> {
     return this.http.post<{ my_rating: number; avg_rating: number | null }>(`${this.baseUrl}/${id}/rate/`, { stars });
+  }
+
+  // Update existing recipe
+  updateRecipe(id: number, body: any): Observable<Recipe> {
+    return this.http.put<Recipe>(`${this.baseUrl}/${id}/`, body);
+  }
+
+  // Tags
+  createTag(name: string): Observable<Tag> {
+    return this.http.post<Tag>(`${environment.apiUrl}/tags/`, { name });
   }
 
   // Comments

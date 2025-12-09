@@ -324,7 +324,7 @@ You can also drive the local choice via run.sh:
 
 6. **Customize**
 
-   * Live preview: palette swatches, light/dark toggle, accent color picker (with contrast guardrails), layout density, Cook Mode text size.
+   * Live preview: palette swatches, light/dark toggle, accent color picker (with contrast guardrails)
 
 7. **Plan & Shopping List**
 

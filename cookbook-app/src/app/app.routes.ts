@@ -7,6 +7,7 @@ import { AuthGuard } from './auth/auth,guard';
 import { ProfileComponent } from './auth/pages/profile/profile.component';
 import { CustomizationsComponent } from './auth/pages/customizations/customizations.component';
 import { AddRecipeComponent } from './recipes/pages/recipe-add/recipe-add.component';
+import { MealPlanComponent } from './recipes/pages/meal-plan/meal-plan.component';
 
 export const routes: Routes = [
   {
@@ -14,6 +15,12 @@ export const routes: Routes = [
   },
   {
     path: 'recipes/:id', component: RecipeDetailComponent,
+  },
+  {
+    path: 'plan', component: MealPlanComponent,
+  },
+  {
+    path: 'recipes/:id/edit', component: AddRecipeComponent, canActivate: [AuthGuard]
   },
   {
     path: 'login', component: LoginComponent,

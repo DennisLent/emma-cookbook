@@ -3,10 +3,12 @@ from .models import Recipe, Tag, Rating, Comment, Ingredient
 from .serializers import RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
 from users.models import User
 import random
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Value, FloatField
+from django.db.models.functions import Coalesce
 from django.db import transaction
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from .meal_plan import generate_meal_plan, swap_recipe
 
 from .extraction.services import (
     extract_recipe_from_website,
@@ -39,6 +41,81 @@ class RecipeViewSet(viewsets.ModelViewSet):
     serializer_class = RecipeSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    class IsOwnerOrReadOnly(permissions.BasePermission):
+        """
+        Only allow the recipe creator to edit/delete. Read-only for others.
+        """
+        def has_object_permission(self, request, view, obj):
+            if request.method in permissions.SAFE_METHODS:
+                return True
+            return getattr(obj, 'created_by', None) == request.user
+
+    def get_permissions(self):
+        # Apply owner check for mutating actions
+        if self.action in ('update', 'partial_update', 'destroy'):
+            return [permissions.IsAuthenticated(), self.IsOwnerOrReadOnly()]
+        return [perm() if isinstance(perm, type) else perm for perm in self.permission_classes]
+
+    def _normalize_payload(self, request):
+        """
+        Normalize incoming payload for create/update:
+        - Accept ingredient names, create/look up Ingredient rows, and build serializer-friendly
+          recipeingredient_set payload.
+        """
+        data = request.data.copy() if isinstance(request.data, QueryDict) else dict(request.data)
+
+        tags = data.getlist('tags') if isinstance(data, QueryDict) else data.get('tags', [])
+        if not tags and isinstance(request.data, QueryDict):
+            # handle FormData keys like tags[0]
+            tags = []
+            for key in request.data.keys():
+                if key.startswith('tags['):
+                    tags.extend(request.data.getlist(key))
+        ingredients = []
+        if isinstance(data.get("ingredients_data"), list):
+          ingredients = data.pop("ingredients_data")
+        else:
+            i = 0
+            while True:
+                nkey = f"ingredients_data[{i}][ingredient]"
+                akey = f"ingredients_data[{i}][amount]"
+                if nkey not in data:
+                    break
+                ingredients.append({
+                    "ingredient": data.pop(nkey),
+                    "amount": data.pop(akey)
+                })
+                i += 1
+
+        nested = []
+        for ing in ingredients:
+            raw_name = ing.get("ingredient") if isinstance(ing, dict) else None
+            raw_amount = ing.get("amount") if isinstance(ing, dict) else ''
+            name = ''
+            if isinstance(raw_name, (list, tuple)):
+                name = str(raw_name[0]).strip()
+            elif isinstance(raw_name, str):
+                name = raw_name.strip()
+            amount = ''
+            if isinstance(raw_amount, (list, tuple)):
+                amount = str(raw_amount[0]).strip()
+            else:
+                amount = str(raw_amount or '').strip()
+            if not name:
+                continue
+            ing_obj, _ = Ingredient.objects.get_or_create(name__iexact=name, defaults={"name": name})
+            nested.append({
+                "ingredient_id": ing_obj.pk,
+                "amount": amount or name,
+            })
+
+        if isinstance(data, QueryDict):
+            data = data.dict()
+        data["ingredients_data"] = nested
+        data["tags"] = tags
+
+        return data
+
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset()
 
@@ -49,7 +126,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         # Only allow sorting for authenticated users
         if request.user and request.user.is_authenticated and sort in ('rating', 'favorites'):
             if sort == 'rating':
-                qs = Recipe.objects.annotate(avg_rating=Avg('ratings__stars')).order_by(f"{dir_prefix}avg_rating", '-created_at')
+                qs = Recipe.objects.annotate(
+                    avg_rating_order=Coalesce(Avg('ratings__stars'), Value(0.0), output_field=FloatField())
+                ).order_by(f"{dir_prefix}avg_rating_order", '-created_at')
             elif sort == 'favorites':
                 qs = Recipe.objects.annotate(fav_count=Count('favorites', distinct=True)).order_by(f"{dir_prefix}fav_count", '-created_at')
 
@@ -139,6 +218,48 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(instance).data,
                         status=status.HTTP_201_CREATED,
                         headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        recipe = self.get_object()
+        data = self._normalize_payload(request)
+        serializer = self.get_serializer(recipe, data=data, partial=False, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='plan', permission_classes=[permissions.AllowAny])
+    def plan(self, request):
+        """Generate a simple meal plan based on diet and size."""
+        diet = (request.data.get('diet_type') or 'omnivore').lower()
+        try:
+            days = max(1, min(14, int(request.data.get('days', 7))))
+            meals_per_day = max(1, min(5, int(request.data.get('meals_per_day', 3))))
+        except Exception:
+            return Response({"detail": "Invalid days or meals_per_day"}, status=status.HTTP_400_BAD_REQUEST)
+
+        plan = generate_meal_plan(diet, days, meals_per_day)
+        serializer = RecipeSerializer
+        data = [[serializer(r, context={"request": request}).data for r in row] for row in plan]
+        return Response({"plan": data})
+
+    @action(detail=False, methods=['post'], url_path='swap', permission_classes=[permissions.AllowAny])
+    def swap(self, request):
+        """Swap a recipe in an existing plan, prefer same protein."""
+        diet = (request.data.get('diet_type') or 'omnivore').lower()
+        try:
+            current_id = int(request.data.get('current_recipe_id'))
+        except Exception:
+            return Response({"detail": "current_recipe_id required"}, status=status.HTTP_400_BAD_REQUEST)
+        existing_ids = request.data.get('existing_plan_ids') or []
+        if not isinstance(existing_ids, (list, tuple)):
+            existing_ids = []
+        existing_ids = [int(i) for i in existing_ids if str(i).isdigit()]
+
+        replacement = swap_recipe(diet, current_id, existing_ids)
+        if not replacement:
+            return Response({"detail": "No replacement found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(RecipeSerializer(replacement, context={"request": request}).data)
 
 
     @action(detail=False, methods=['get'], url_path='suggestions')
