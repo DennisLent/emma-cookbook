@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { HeaderComponent } from '../header/header.component';
@@ -7,6 +7,7 @@ import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { map, filter } from 'rxjs/operators';
 import { SidenavComponent } from '../sidenav/sidenav.component';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSidenav } from '@angular/material/sidenav';
 import { FooterComponent } from '../footer/footer.component';
 
 @Component({
@@ -24,6 +25,8 @@ import { FooterComponent } from '../footer/footer.component';
   styleUrl: './layout.component.scss'
 })
 export class LayoutComponent {
+  @ViewChild('drawer') drawer?: MatSidenav;
+
   isHandset = false;
   drawerOpened = false;
   isLogin = false;
@@ -47,6 +50,10 @@ export class LayoutComponent {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event: NavigationEnd) => {
         this.isLogin = layoutExcludedRoutes.includes(event.url);
+        if (this.isHandset && this.drawerOpened) {
+          this.drawerOpened = false;
+          this.drawer?.close();
+        }
       });
 
   }

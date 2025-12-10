@@ -28,10 +28,10 @@
   </div>
 
   <div *ngIf="plan.length" class="plan-grid">
-    <div class="day-card card" *ngFor="let day of plan; let d = index">
-      <div class="day-header">Day {{ d + 1 }}</div>
+      <div class="day-card card" *ngFor="let day of plan; let d = index">
+        <div class="day-header">Day {{ d + 1 }}</div>
       <div class="meal-row" *ngFor="let meal of day; let m = index">
-        <div class="meal-meta">
+        <div class="meal-meta" (click)="goToRecipe(meal.id)">
           <div class="meal-title">{{ meal.title }}</div>
           <div class="meal-tags">
             <span class="chip">{{ protein(meal) }}</span>
