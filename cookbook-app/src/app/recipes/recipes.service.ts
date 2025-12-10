@@ -92,6 +92,10 @@ export class RecipeService {
     return this.http.put<Recipe>(`${this.baseUrl}/${id}/`, body);
   }
 
+  deleteRecipe(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}/`);
+  }
+
   // Tags
   createTag(name: string): Observable<Tag> {
     return this.http.post<Tag>(`${environment.apiUrl}/tags/`, { name });

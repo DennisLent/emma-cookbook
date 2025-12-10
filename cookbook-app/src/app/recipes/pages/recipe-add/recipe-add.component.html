@@ -5,14 +5,14 @@
   </div>
 
   <!-- Top segmented tabs -->
-  <div class="segmented card">
+  <div class="segmented card" *ngIf="allowImportModes">
     <button class="seg" [class.active]="mode==='manual'" (click)="mode='manual'">Manual</button>
     <button class="seg" [class.active]="mode==='paste'" (click)="mode='paste'">Paste</button>
     <button class="seg" [class.active]="mode==='url'" (click)="mode='url'">From URL</button>
   </div>
 
   <!-- URL notice / optional preview -->
-  <div *ngIf="mode==='url'" class="url-block card">
+  <div *ngIf="allowImportModes && mode==='url'" class="url-block card">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Recipe URL</mat-label>
       <input matInput [(ngModel)]="websiteUrl" />
@@ -25,7 +25,7 @@
   </div>
 
   <!-- Paste block -->
-  <div *ngIf="mode==='paste'" class="paste-block card">
+  <div *ngIf="allowImportModes && mode==='paste'" class="paste-block card">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Paste Recipe</mat-label>
       <textarea matInput rows="10" placeholder="Paste ingredients and steps here (one per line)" [(ngModel)]="pasteText" (blur)="applyPasted(pasteText)"></textarea>
@@ -37,12 +37,12 @@
   <form [formGroup]="recipeForm" (ngSubmit)="onSubmit()" class="recipe-form card">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Title</mat-label>
-      <input matInput formControlName="title" placeholder="Recipe title" />
+      <input matInput formControlName="title" [placeholder]="isEditing ? '' : 'Recipe title'" />
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Description</mat-label>
-      <textarea matInput rows="3" formControlName="description" placeholder="Brief description"></textarea>
+      <textarea matInput rows="3" formControlName="description" [placeholder]="isEditing ? '' : 'Brief description'"></textarea>
     </mat-form-field>
 
     <div class="grid-3">
@@ -52,11 +52,11 @@
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Prep (min)</mat-label>
-        <input matInput formControlName="prep_time" placeholder="e.g. 15 min" />
+        <input matInput formControlName="prep_time" [placeholder]="isEditing ? '' : 'e.g. 15 min'" />
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Cook (min)</mat-label>
-        <input matInput formControlName="cook_time" placeholder="e.g. 30 min" />
+        <input matInput formControlName="cook_time" [placeholder]="isEditing ? '' : 'e.g. 30 min'" />
       </mat-form-field>
     </div>
 
@@ -78,11 +78,11 @@
       <div class="ingredient-row" *ngFor="let g of ingredients.controls; let i = index" [formGroupName]="i">
         <mat-form-field appearance="outline" class="flex-2">
           <mat-label>Item *</mat-label>
-          <input matInput formControlName="ingredient" placeholder="e.g. Flour" />
+          <input matInput formControlName="ingredient" [placeholder]="isEditing ? '' : 'e.g. Flour'" />
         </mat-form-field>
         <mat-form-field appearance="outline" class="flex-1">
           <mat-label>Amount</mat-label>
-          <input matInput formControlName="amount" placeholder="e.g. 2 cups" />
+          <input matInput formControlName="amount" [placeholder]="isEditing ? '' : 'e.g. 2 cups'" />
         </mat-form-field>
         <button mat-icon-button color="warn" (click)="removeIngredient(i)"><mat-icon>delete</mat-icon></button>
       </div>
@@ -91,7 +91,7 @@
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Steps *</mat-label>
-      <textarea matInput rows="6" formControlName="instructions" placeholder="Steps (one per line)"></textarea>
+      <textarea matInput rows="6" formControlName="instructions" [placeholder]="isEditing ? '' : 'Steps (one per line)'"></textarea>
     </mat-form-field>
 
     <div class="actions">

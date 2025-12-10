@@ -18,7 +18,12 @@
         <mat-icon>edit</mat-icon>
         Edit
       </button>
+      <button *ngIf="isOwner" mat-stroked-button color="warn" class="edit-btn" (click)="deleteRecipe()" [disabled]="deleting">
+        <mat-icon>delete</mat-icon>
+        {{ deleting ? 'Deleting…' : 'Delete' }}
+      </button>
     </h1>
+    <p class="status error" *ngIf="deleteError">{{ deleteError }}</p>
     <p class="subtitle" *ngIf="recipe.description">{{ recipe.description }}</p>
     <div class="chip-row" *ngIf="recipe.tags?.length">
       <span class="chip" *ngFor="let tag of recipe.tags">{{ tag }}</span>

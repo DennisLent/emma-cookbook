@@ -1,11 +1,22 @@
 .meal-plan { padding: 16px 0; }
-.controls .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: center; }
+.controls .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: center; }
 .controls .status { margin-top: 8px; color: var(--color-muted); }
 .controls .status.error { color: var(--color-danger); }
-.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
 .day-card { padding: 12px; display: grid; gap: 12px; }
 .day-header { font-weight: 700; }
-.meal-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.meal-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); flex-wrap: wrap; }
 .meal-title { font-weight: 600; }
 .meal-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { padding: 4px 8px; border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-surface); font-size: 12px; text-transform: lowercase; }
+
+@media (max-width: 768px) {
+  .plan-grid { grid-template-columns: 1fr; }
+  .meal-row { flex-direction: column; align-items: flex-start; }
+  .meal-row button { width: 100%; justify-content: center; }
+  .meal-meta { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .controls .row { grid-template-columns: 1fr; }
+}

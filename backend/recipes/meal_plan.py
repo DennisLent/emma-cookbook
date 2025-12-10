@@ -31,16 +31,16 @@ def get_base_queryset(diet_type: str) -> QuerySet[Recipe]:
     return qs.filter(tags__name__in=allowed).distinct()
 
 
-def main_protein(recipe: Recipe) -> str:
+def main_protein(recipe: Recipe) -> str | None:
     """
-    Return the first protein tag suffix (protein:<type>) or 'unknown'.
+    Return the first protein tag suffix (protein:<type>) or None if missing.
     """
     if not recipe:
-        return "unknown"
+        return None
     for tag in recipe.tags.all():
         if tag.name.startswith("protein:"):
             return tag.name.split(":", 1)[1]
-    return "unknown"
+    return None
 
 
 def generate_meal_plan(diet_type: str, days: int, meals_per_day: int) -> List[List[Recipe]]:

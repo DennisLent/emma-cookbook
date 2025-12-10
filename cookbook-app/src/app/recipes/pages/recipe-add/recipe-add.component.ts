@@ -34,6 +34,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 export class AddRecipeComponent implements OnInit {
   // UI modes per design: Manual | Paste | From URL
   mode: 'manual' | 'paste' | 'url' = 'manual';
+  allowImportModes = true;
   websiteUrl = '';
   isPreviewing = false;
   previewError = '';
@@ -70,9 +71,15 @@ export class AddRecipeComponent implements OnInit {
       image: [null]
     });
 
+    if (!this.ingredients.length) {
+      this.addIngredient();
+    }
+
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       this.isEditing = true;
+      this.allowImportModes = false;
+      this.mode = 'manual';
       this.recipeId = Number(idParam);
       this.loadRecipe(this.recipeId);
     }
@@ -148,18 +155,7 @@ export class AddRecipeComponent implements OnInit {
       tags: recipe.tags ?? []
     });
 
-    this.ingredients.clear();
-
-    if (Array.isArray(recipe.ingredients_data)) {
-      for (const ing of recipe.ingredients_data) {
-        this.ingredients.push(
-          this.fb.group({
-            ingredient: [ing.ingredient, Validators.required],
-            amount: [ing.amount, Validators.required]
-          })
-        );
-      }
-    }
+    this.setIngredients(recipe.ingredients_data || recipe.ingredients);
   }
 
   // SUBMIT
@@ -268,13 +264,21 @@ export class AddRecipeComponent implements OnInit {
       image: null
     });
 
+    this.setIngredients(recipe.ingredients || (recipe as any).ingredients_data);
+  }
+
+  private setIngredients(list: any) {
     this.ingredients.clear();
-    if (Array.isArray(recipe.ingredients)) {
-      recipe.ingredients.forEach(ing => {
+    if (Array.isArray(list)) {
+      list.forEach((ing: any) => {
+        const nameRaw = ing?.ingredient?.name ?? ing?.ingredient ?? ing?.ingredient_id ?? '';
+        const amountRaw = ing?.amount ?? '';
+        const name = nameRaw == null ? '' : String(nameRaw);
+        const amount = amountRaw == null ? '' : String(amountRaw);
         this.ingredients.push(
           this.fb.group({
-            ingredient: [ing.ingredient?.name || '', Validators.required],
-            amount: [ing.amount || '', Validators.required]
+            ingredient: [name, Validators.required],
+            amount: [amount, Validators.required]
           })
         );
       });

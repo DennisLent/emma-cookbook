@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { RecipeService } from '../../recipes.service';
 import { Recipe, Comment } from '../../recipes.model';
 import { CommonModule } from '@angular/common';
@@ -53,11 +53,14 @@ export class RecipeDetailComponent implements OnInit {
   commentInput: string = '';
   isOwner = false;
   currentUser?: string;
+  deleting = false;
+  deleteError = '';
 
   constructor(
     private route: ActivatedRoute,
     private recipeService: RecipeService,
-    private auth: AuthService
+    private auth: AuthService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -165,5 +168,21 @@ export class RecipeDetailComponent implements OnInit {
       return;
     }
     this.isOwner = this.recipe.created_by === this.currentUser;
+  }
+
+  deleteRecipe() {
+    if (!this.recipe || !this.isOwner || this.deleting) return;
+    const confirmed = confirm('Delete this recipe? This cannot be undone.');
+    if (!confirmed) return;
+    this.deleting = true;
+    this.deleteError = '';
+    this.recipeService.deleteRecipe(this.recipe.id).subscribe({
+      next: () => this.router.navigate(['/']),
+      error: err => {
+        console.error('Delete failed', err);
+        this.deleting = false;
+        this.deleteError = err?.error?.detail || 'Failed to delete recipe.';
+      }
+    });
   }
 }

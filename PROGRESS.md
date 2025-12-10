@@ -18,8 +18,8 @@ Legend: [x] completed, [ ] not yet
 - [x] Ingredient model + structured linkage to recipes
 - [x] Preview/import from Website (backend + UI)
 - [x] Preview/import from YouTube (backend + UI)
-- [ ] Edit recipe (update flow in UI)
-- [ ] Delete recipe (UI)
+- [x] Edit recipe (update flow in UI)
+- [x] Delete recipe (UI)
 - [ ] Paste-text import with guided split
 - [ ] Full JSON export/import (backup/restore endpoints + UI)
 
@@ -28,7 +28,7 @@ Legend: [x] completed, [ ] not yet
 - [x] Tag filtering with chips
 - [x] Suggestions carousel (server-provided)
 - [x] Filter by ingredients
-- [ ] Sort by newest/top rated
+- [x] Sort by newest/top rated
   - Note: Top rated / favorites sorting is implemented; "newest" sort pending.
 
 ## Cooking Experience

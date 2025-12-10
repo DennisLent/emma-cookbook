@@ -38,6 +38,7 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
   loading = false;
   hasMore = true;
   lastSearch = { term: '', tags: [] as string[] };
+  private randomWeights = new Map<number, number>();
   private observer?: IntersectionObserver;
 
   // Sorting
@@ -83,7 +84,7 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
       .map(s => s.trim())
       .filter(Boolean);
 
-    this.filteredRecipes = this.recipes.filter(r => {
+    const filtered = this.recipes.filter(r => {
       const tagMatch = (!tags.length) || tags.every(tag => r.tags.includes(tag));
       if (!raw) return tagMatch; // no text search
 
@@ -101,6 +102,10 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       return tagMatch && allTokensMatch;
     });
+
+    this.filteredRecipes = this.sortChoice
+      ? filtered
+      : this.mixRecencyWithRandomness(filtered);
   }
 
   private loadRecipes() {
@@ -168,6 +173,7 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
     this.hasMore = true;
     this.recipes = [];
     this.filteredRecipes = [];
+    this.randomWeights.clear();
     this.loadRecipes();
   }
 
@@ -180,5 +186,23 @@ export class RecipeListComponent implements OnInit, AfterViewInit, OnDestroy {
       return { sort: 'favorites', direction: this.sortChoice.endsWith('asc') ? 'asc' : 'desc' };
     }
     return {};
+  }
+
+  private mixRecencyWithRandomness(list: Recipe[]): Recipe[] {
+    const jitterRangeMs = 1000 * 60 * 90; // up to 90 minutes of shuffle to break strict recency
+    return [...list].sort((a, b) => {
+      const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
+      const aScore = aCreated + this.randomWeight(a) * jitterRangeMs;
+      const bScore = bCreated + this.randomWeight(b) * jitterRangeMs;
+      return bScore - aScore;
+    });
+  }
+
+  private randomWeight(recipe: Recipe): number {
+    if (!this.randomWeights.has(recipe.id)) {
+      this.randomWeights.set(recipe.id, Math.random());
+    }
+    return this.randomWeights.get(recipe.id)!;
   }
 }
