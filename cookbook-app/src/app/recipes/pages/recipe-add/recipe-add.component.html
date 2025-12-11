@@ -6,9 +6,15 @@
 
   <!-- Top segmented tabs -->
   <div class="segmented card" *ngIf="allowImportModes">
-    <button class="seg" [class.active]="mode==='manual'" (click)="mode='manual'">Manual</button>
-    <button class="seg" [class.active]="mode==='paste'" (click)="mode='paste'">Paste</button>
-    <button class="seg" [class.active]="mode==='url'" (click)="mode='url'">From URL</button>
+    <mat-button-toggle-group
+      [(ngModel)]="mode"
+      name="recipeMode"
+      aria-label="Select recipe input mode"
+      class="seg-toggle">
+      <mat-button-toggle value="manual">Manual</mat-button-toggle>
+      <mat-button-toggle value="paste">Paste</mat-button-toggle>
+      <mat-button-toggle value="url">From URL</mat-button-toggle>
+    </mat-button-toggle-group>
   </div>
 
   <!-- URL notice / optional preview -->
@@ -28,7 +34,14 @@
   <div *ngIf="allowImportModes && mode==='paste'" class="paste-block card">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Paste Recipe</mat-label>
-      <textarea matInput rows="10" placeholder="Paste ingredients and steps here (one per line)" [(ngModel)]="pasteText" (blur)="applyPasted(pasteText)"></textarea>
+      <textarea
+        matInput
+        cdkTextareaAutosize
+        cdkAutosizeMinRows="10"
+        cdkAutosizeMaxRows="30"
+        placeholder="Paste ingredients and steps here (one per line)"
+        [(ngModel)]="pasteText"
+        (blur)="applyPasted(pasteText)"></textarea>
       <mat-hint>Paste your recipe text. We'll try to split it into ingredients and steps automatically later.</mat-hint>
     </mat-form-field>
   </div>
@@ -37,7 +50,7 @@
   <form [formGroup]="recipeForm" (ngSubmit)="onSubmit()" class="recipe-form card">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Title</mat-label>
-      <input matInput formControlName="title" [placeholder]="isEditing ? '' : 'Recipe title'" />
+      <input matInput formControlName="title" />
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">

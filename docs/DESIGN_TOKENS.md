@@ -9,7 +9,8 @@ These tokens define the visual system used across the app. Use the CSS variables
 - `--color-muted`: Secondary text
 - `--color-border`: Borders/dividers
 - `--color-primary` / `--color-primary-hover`: Accent color
-- `--color-success`, `--color-warning`, `--color-danger`
+- `--color-success`, `--color-warning`, `--color-danger`, `--color-warn` (alias for danger)
+- `--color-light`: Subtle fill for chips/strips
 
 ## Typography
 - Base font family: `Inter, Roboto, Helvetica Neue, Arial, sans-serif`
@@ -38,7 +39,7 @@ Headings are normalized in `src/styles.scss` (h1/h2/h3) using these tokens. Use 
 - `--radius-md: 12px` (default card)
 - `--radius-lg: 16px` (large surfaces)
 - `--radius-pill: 999px` (chips/pills)
-- Shadows: `--shadow-sm`, `--shadow-md`
+- Shadows: `--shadow-sm`, `--shadow-md`, `--shadow-lg`
 
 ## Focus
 - `--focus-ring`: shared focus ring (applies via `*:focus-visible` in styles.scss)

@@ -1,17 +1,5 @@
-.customizations-container {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-  height: 100vh;
-}
-
-.segmented-card {
-  width: 100%;
-  max-width: 920px;
-}
-
 /* Segmented control (match Add Recipe) */
-.segmented { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 6px; border-radius: var(--radius-lg); border: 1px solid var(--color-border); margin-bottom: 16px; }
+.segmented { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
 .seg { border: 0; border-radius: 999px; padding: 10px 12px; background: transparent; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; justify-content: center; }
 .seg.active { background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface)); color: var(--color-text); }
 
@@ -23,9 +11,6 @@
   min-height: 20px;
   padding: 8px 8px 0;
 }
-
-.success { color: #2e7d32; }
-.error { color: #c62828; }
 
 .color-row {
   display: grid;

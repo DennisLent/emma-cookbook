@@ -12,6 +12,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ActivatedRoute, Router } from '@angular/router';
+import { TextFieldModule } from '@angular/cdk/text-field';
 
 @Component({
   selector: 'app-recipe-add',
@@ -26,7 +27,8 @@ import { ActivatedRoute, Router } from '@angular/router';
     MatIconModule,
     MatDividerModule,
     MatButtonToggleModule,
-    FormsModule
+    FormsModule,
+    TextFieldModule
   ],
   templateUrl: './recipe-add.component.html',
   styleUrls: ['./recipe-add.component.scss']

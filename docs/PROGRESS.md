@@ -48,7 +48,7 @@ Legend: [x] completed, [ ] not yet
 - [x] Light theme baseline (CSS variables)
 - [x] Accent color picker + site title/logo settings
 - [x] Dark theme toggle
-- [ ] Per‑user preferences (theme, density, accessibility)
+- [x] Per‑user preferences (theme, density, accessibility)
 
 ### Layout Customization
 - [x] Recipe detail layout builder (1–3 columns, drag & drop, adjustable widths)

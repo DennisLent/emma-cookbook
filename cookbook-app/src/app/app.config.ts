@@ -8,6 +8,7 @@ import { AuthInterceptor } from './auth/auth.interceptor';
 import { provideKeycloakInit } from './keycloak-init';
 import { APP_INITIALIZER } from '@angular/core';
 import { TranslateService } from './core/i18n/translate.service';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -29,6 +30,10 @@ export const appConfig: ApplicationConfig = {
       ionBook,
       ionAnalytics,
       ionReceipt
-    })
+    }),
+    {
+      provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
+      useValue: { floatLabel: 'always', appearance: 'outline' }
+    }
   ]
 };

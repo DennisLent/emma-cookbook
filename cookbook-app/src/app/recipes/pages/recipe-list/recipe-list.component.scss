@@ -51,7 +51,7 @@
   .meta mat-icon { font-size: 18px; height: 18px; width: 18px; margin-right: 4px; }
 
   .tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-  .chip { border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 4px 10px; font-size: var(--fs-xs); }
+  .chip { padding: 4px 10px; font-size: var(--fs-xs); }
 }
 
 .loading-anchor { height: 1px; }
@@ -60,7 +60,6 @@
    - Phones: 1 column
    - Small tablets: min 220px, typically 2–3 columns
    - Large screens: container width allows 4–5 columns with 260px cards */
-@media (max-width: 599px) { .recipe-grid { grid-template-columns: 1fr; } }
 @media (max-width: 599px) { .recipe-grid { grid-template-columns: 1fr; } }
 /* At very large widths allow tighter min to fit 4 columns if space allows */
 @media (min-width: 1600px) { .recipe-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); } }
