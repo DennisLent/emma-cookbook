@@ -1,24 +1,17 @@
 from rest_framework import viewsets, permissions, status
 from .models import Recipe, Tag, Rating, Comment, Ingredient
-from .serializers import RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
-from users.models import User
+from .serializers import CollectionSerializer, RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
 import random
-from django.db.models import Avg, Count, Value, FloatField
+from django.db.models import Avg, Case, FloatField, IntegerField, Value, When
 from django.db.models.functions import Coalesce
 from django.db import transaction
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .meal_plan import generate_meal_plan, swap_recipe
-
-from .extraction.services import (
-    extract_recipe_from_website,
-    extract_recipe_from_youtube,
-    extract_recipe_from_instagram,
-)
-from .extraction.utils.instagram import InstagramCheckpointRequired
+from .meal_plan import generate_balanced_meal_plan, generate_meal_plan, swap_recipe
+from .models import Collection
+from cookbook.api_errors import error_response
 
 import traceback
-from django.http import QueryDict
 
 # Custom permission
 class IsAuthorOrReadOnly(permissions.BasePermission):
@@ -37,7 +30,15 @@ class IsAuthorOrReadOnly(permissions.BasePermission):
         return owner == request.user
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    queryset = Recipe.objects.all().order_by('-created_at')
+    queryset = Recipe.objects.prefetch_related(
+        'tags',
+        'recipe_ingredients',
+        'steps__ingredients',
+        'suggested_sides',
+        'suggested_sauces',
+        'ratings',
+        'comments',
+    ).order_by('-created_at')
     serializer_class = RecipeSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
@@ -56,66 +57,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), self.IsOwnerOrReadOnly()]
         return [perm() if isinstance(perm, type) else perm for perm in self.permission_classes]
 
-    def _normalize_payload(self, request):
-        """
-        Normalize incoming payload for create/update:
-        - Accept ingredient names, create/look up Ingredient rows, and build serializer-friendly
-          recipeingredient_set payload.
-        """
-        data = request.data.copy() if isinstance(request.data, QueryDict) else dict(request.data)
-
-        tags = data.getlist('tags') if isinstance(data, QueryDict) else data.get('tags', [])
-        if not tags and isinstance(request.data, QueryDict):
-            # handle FormData keys like tags[0]
-            tags = []
-            for key in request.data.keys():
-                if key.startswith('tags['):
-                    tags.extend(request.data.getlist(key))
-        ingredients = []
-        if isinstance(data.get("ingredients_data"), list):
-          ingredients = data.pop("ingredients_data")
-        else:
-            i = 0
-            while True:
-                nkey = f"ingredients_data[{i}][ingredient]"
-                akey = f"ingredients_data[{i}][amount]"
-                if nkey not in data:
-                    break
-                ingredients.append({
-                    "ingredient": data.pop(nkey),
-                    "amount": data.pop(akey)
-                })
-                i += 1
-
-        nested = []
-        for ing in ingredients:
-            raw_name = ing.get("ingredient") if isinstance(ing, dict) else None
-            raw_amount = ing.get("amount") if isinstance(ing, dict) else ''
-            name = ''
-            if isinstance(raw_name, (list, tuple)):
-                name = str(raw_name[0]).strip()
-            elif isinstance(raw_name, str):
-                name = raw_name.strip()
-            amount = ''
-            if isinstance(raw_amount, (list, tuple)):
-                amount = str(raw_amount[0]).strip()
-            else:
-                amount = str(raw_amount or '').strip()
-            if not name:
-                continue
-            ing_obj, _ = Ingredient.objects.get_or_create(name__iexact=name, defaults={"name": name})
-            nested.append({
-                "ingredient_id": ing_obj.pk,
-                "amount": amount or name,
-            })
-
-        if isinstance(data, QueryDict):
-            data = data.dict()
-        data["ingredients_data"] = nested
-        data["tags"] = tags
-
-        return data
-
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset()
 
@@ -123,14 +64,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
         direction = request.query_params.get('direction', 'desc')
         dir_prefix = '-' if direction == 'desc' else ''
 
-        # Only allow sorting for authenticated users
         if request.user and request.user.is_authenticated and sort in ('rating', 'favorites'):
             if sort == 'rating':
                 qs = Recipe.objects.annotate(
                     avg_rating_order=Coalesce(Avg('ratings__stars'), Value(0.0), output_field=FloatField())
                 ).order_by(f"{dir_prefix}avg_rating_order", '-created_at')
             elif sort == 'favorites':
-                qs = Recipe.objects.annotate(fav_count=Count('favorites', distinct=True)).order_by(f"{dir_prefix}fav_count", '-created_at')
+                favorite_ids = request.user.favorite_recipe_ids or []
+                whens = [When(pk=recipe_id, then=Value(1)) for recipe_id in favorite_ids]
+                qs = qs.annotate(
+                    favorite_rank=Case(
+                        *whens,
+                        default=Value(0),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(f"{dir_prefix}favorite_rank", '-created_at')
 
         page = self.paginate_queryset(qs)
         if page is not None:
@@ -141,76 +89,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
-
-        print(">>> RAW request.data:", request.data)
-
-        if isinstance(request.data, QueryDict):
-            data = request.data.copy()
-        else:
-            data = dict(request.data)
-        print(">>> After copy/normalize:", data)
-
-        for opt in (
-            "servings", "prep_time", "cook_time", "total_time",
-            "origin", "source_name", "source_url", "author_name",
-            "cuisine", "course", "difficulty", "calories",
-            "nutrition", "equipment", "notes", "video_url",
-        ):
-            if not data.get(opt):
-                data.pop(opt, None)
-        print(">>> After dropping blank optionals:", data)
-
-        ingredients = []
-        if isinstance(data.get("ingredients_data"), list):
-            # JSON payload case
-            ingredients = data.pop("ingredients_data")
-        else:
-            # form-data case
-            i = 0
-            while True:
-                nkey = f"ingredients_data[{i}][ingredient]"
-                akey = f"ingredients_data[{i}][amount]"
-                if nkey not in data:
-                    break
-
-                raw_name   = data.pop(nkey)
-                raw_amount = data.pop(akey)
-
-                name   = raw_name[0]   if isinstance(raw_name, (list, tuple))   else raw_name
-                amount = raw_amount[0] if isinstance(raw_amount, (list, tuple)) else raw_amount
-
-                ingredients.append({
-                    "ingredient": name,
-                    "amount":     amount,
-                })
-                i += 1
-            print(">>> Parsed form-data ingredients_data:", ingredients)
-
-
-        nested = []
-        for ing in ingredients:
-            name, amount = ing["ingredient"], ing["amount"]
-            obj, _ = Ingredient.objects.get_or_create(
-                name__iexact=name, defaults={"name": name}
-            )
-            nested.append({
-                "ingredient_id": obj.pk,
-                "amount":        amount,
-            })
-        print(">>> Built nested recipeingredient_set:", nested)
-
-        if isinstance(data, QueryDict):
-            data.setlist("ingredients_data", nested)
-        else:
-            data["ingredients_data"] = nested
-        print(">>> Final payload for serializer:", data)
-
-        serializer = self.get_serializer(data=data, context={"request": request})
-        if not serializer.is_valid():
-            print(">>> Serializer errors:", serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+        serializer = self.get_serializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             instance = serializer.save(created_by=request.user)
 
@@ -221,27 +101,54 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         recipe = self.get_object()
-        data = self._normalize_payload(request)
-        serializer = self.get_serializer(recipe, data=data, partial=False, context={"request": request})
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(recipe, data=request.data, partial=False, context={"request": request})
+        serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='plan', permission_classes=[permissions.AllowAny])
     def plan(self, request):
-        """Generate a simple meal plan based on diet and size."""
+        """Generate a meal plan based on frontend filters.
+
+        Error cases are returned with structured codes so the frontend can show
+        actionable messages instead of generic failures.
+        """
         diet = (request.data.get('diet_type') or 'omnivore').lower()
+        meal_types = request.data.get('meal_types') or ["breakfast", "lunch", "dinner"]
+        dietary_filters = request.data.get('dietary_filters') or []
         try:
             days = max(1, min(14, int(request.data.get('days', 7))))
-            meals_per_day = max(1, min(5, int(request.data.get('meals_per_day', 3))))
         except Exception:
-            return Response({"detail": "Invalid days or meals_per_day"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="invalid_meal_plan_days",
+                message="The meal plan days value must be a valid integer between 1 and 14.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "days"},
+            )
 
-        plan = generate_meal_plan(diet, days, meals_per_day)
-        serializer = RecipeSerializer
-        data = [[serializer(r, context={"request": request}).data for r in row] for row in plan]
-        return Response({"plan": data})
+        if not isinstance(meal_types, list) or not meal_types:
+            return error_response(
+                code="invalid_meal_types",
+                message="At least one meal type must be selected.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "meal_types"},
+            )
+
+        entries = generate_balanced_meal_plan(
+            days=days,
+            meal_types=meal_types,
+            dietary_filters=dietary_filters,
+        )
+        serialized_entries = []
+        for entry in entries:
+            serialized_entries.append(
+                {
+                    "day": entry["day"],
+                    "mealType": entry["mealType"],
+                    "recipe": RecipeSerializer(entry["recipe"], context={"request": request}).data if entry["recipe"] else None,
+                }
+            )
+        return Response({"entries": serialized_entries})
 
     @action(detail=False, methods=['post'], url_path='swap', permission_classes=[permissions.AllowAny])
     def swap(self, request):
@@ -250,15 +157,29 @@ class RecipeViewSet(viewsets.ModelViewSet):
         try:
             current_id = int(request.data.get('current_recipe_id'))
         except Exception:
-            return Response({"detail": "current_recipe_id required"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="missing_current_recipe_id",
+                message="A valid current_recipe_id is required to swap a meal plan recipe.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "current_recipe_id"},
+            )
         existing_ids = request.data.get('existing_plan_ids') or []
         if not isinstance(existing_ids, (list, tuple)):
             existing_ids = []
         existing_ids = [int(i) for i in existing_ids if str(i).isdigit()]
 
-        replacement = swap_recipe(diet, current_id, existing_ids)
+        replacement = swap_recipe(
+            diet,
+            current_id,
+            existing_ids,
+            request.data.get('dietary_filters') or [],
+        )
         if not replacement:
-            return Response({"detail": "No replacement found"}, status=status.HTTP_404_NOT_FOUND)
+            return error_response(
+                code="replacement_not_found",
+                message="No suitable replacement recipe could be found for the current meal plan slot.",
+                http_status=status.HTTP_404_NOT_FOUND,
+            )
         return Response(RecipeSerializer(replacement, context={"request": request}).data)
 
 
@@ -285,45 +206,80 @@ class RecipeViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], url_path="preview/website", permission_classes=[permissions.IsAuthenticated])
     def get_from_website(self, request):
+        from .extraction.services import extract_recipe_from_website
+
         url = request.data.get('url')
         if not url:
-            return Response({"detail": "Missing `url`"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="missing_url",
+                message="A source URL is required for website recipe preview.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "url"},
+            )
         
         try:
             data = extract_recipe_from_website(url=url)
         except Exception as e:
             traceback.print_exc()
-            return Response({"detail": str(e)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return error_response(
+                code="website_preview_failed",
+                message="The backend could not extract recipe data from the provided website.",
+                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"reason": str(e)},
+            )
 
         return Response(data)
     
     @action(detail=False, methods=['post'], url_path="preview/youtube", permission_classes=[permissions.IsAuthenticated])
     def get_from_youtube(self, request):
+        from .extraction.services import extract_recipe_from_youtube
+
         video_url = request.data.get('video_url')
         if not video_url:
-            return Response({"detail": "Missing `video_url`"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="missing_video_url",
+                message="A video URL is required for YouTube recipe preview.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "video_url"},
+            )
 
         try:
             data = extract_recipe_from_youtube(video_url, model="llama3.2")
         except Exception as e:
             traceback.print_exc()
-            return Response({"detail": str(e)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return error_response(
+                code="youtube_preview_failed",
+                message="The backend could not extract recipe data from the provided YouTube video.",
+                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"reason": str(e)},
+            )
 
         if data is None:
-            return Response({"detail": "No recipe found in that video."},status=status.HTTP_204_NO_CONTENT)
+            return error_response(
+                code="youtube_recipe_not_found",
+                message="No recipe data could be found in the provided YouTube video.",
+                http_status=status.HTTP_404_NOT_FOUND,
+            )
 
         return Response(data)
 
     @action(detail=False, methods=['post'], url_path="preview/instagram", permission_classes=[permissions.IsAuthenticated])
     def get_from_instagram(self, request):
         """Preview a recipe from an Instagram Reel."""
+        from .extraction.services import extract_recipe_from_instagram
+        from .extraction.utils.instagram import InstagramCheckpointRequired
 
         video_url   = request.data.get('video_url')
         ig_username = request.data.get('ig_username')
         ig_password = request.data.get('ig_password')
 
         if not video_url:
-            return Response({"detail": "Missing `video_url`"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="missing_video_url",
+                message="A video URL is required for Instagram recipe preview.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "video_url"},
+            )
 
         try:
             data = extract_recipe_from_instagram(
@@ -333,13 +289,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 ig_password=ig_password,
             )
         except InstagramCheckpointRequired as e:
-            return Response({"detail": str(e), "challenge_url": e.challenge_url}, status=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                code="instagram_checkpoint_required",
+                message=str(e),
+                http_status=status.HTTP_403_FORBIDDEN,
+                details={"challenge_url": e.challenge_url},
+            )
         except Exception as e:
             traceback.print_exc()
-            return Response({"detail": str(e)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return error_response(
+                code="instagram_preview_failed",
+                message="The backend could not extract recipe data from the provided Instagram video.",
+                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details={"reason": str(e)},
+            )
 
         if data is None:
-            return Response({"detail": "No recipe found in that video."}, status=status.HTTP_204_NO_CONTENT)
+            return error_response(
+                code="instagram_recipe_not_found",
+                message="No recipe data could be found in the provided Instagram video.",
+                http_status=status.HTTP_404_NOT_FOUND,
+            )
 
         return Response(data)
 
@@ -348,26 +318,32 @@ class RecipeViewSet(viewsets.ModelViewSet):
         """Favorite/unfavorite a recipe for the current user, or fetch status."""
         recipe = self.get_object()
         user = request.user
+        favorites = list(user.favorite_recipe_ids or [])
+        is_favorited = recipe.pk in favorites
 
         if request.method == 'GET':
-            is_favorited = recipe.favorites.filter(user=user).exists()
             return Response({
                 'is_favorited': is_favorited,
-                'favorites_count': recipe.favorites.count(),
+                'favorites_count': RecipeSerializer(recipe, context={"request": request}).data["favorites_count"],
             })
 
         if request.method == 'POST':
-            recipe.favorites.get_or_create(user=user)
+            if not is_favorited:
+                favorites.append(recipe.pk)
+                user.favorite_recipe_ids = favorites
+                user.save(update_fields=["favorite_recipe_ids"])
             return Response({
                 'is_favorited': True,
-                'favorites_count': recipe.favorites.count(),
+                'favorites_count': RecipeSerializer(recipe, context={"request": request}).data["favorites_count"],
             }, status=status.HTTP_200_OK)
 
         # DELETE
-        recipe.favorites.filter(user=user).delete()
+        if is_favorited:
+            user.favorite_recipe_ids = [favorite_id for favorite_id in favorites if favorite_id != recipe.pk]
+            user.save(update_fields=["favorite_recipe_ids"])
         return Response({
             'is_favorited': False,
-            'favorites_count': recipe.favorites.count(),
+            'favorites_count': RecipeSerializer(recipe, context={"request": request}).data["favorites_count"],
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='rate', permission_classes=[permissions.IsAuthenticated])
@@ -378,9 +354,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
         try:
             stars = int(request.data.get('stars'))
         except Exception:
-            return Response({"detail": "Missing or invalid 'stars' (1-5)"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="invalid_rating",
+                message="A valid stars value between 1 and 5 is required.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "stars"},
+            )
         if not (1 <= stars <= 5):
-            return Response({"detail": "'stars' must be between 1 and 5"}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                code="rating_out_of_range",
+                message="Ratings must be between 1 and 5.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "stars"},
+            )
 
         rating, _created = Rating.objects.get_or_create(recipe=recipe, user=user, defaults={'stars': stars})
         if not _created:
@@ -401,6 +387,8 @@ class IngredientViewSet(viewsets.ModelViewSet):
     queryset = Ingredient.objects.all().order_by('name')
     serializer_class = IngredientSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+
 class TagViewSet(viewsets.ModelViewSet):
     """
     Anyone can list/retrieve tags.
@@ -437,3 +425,14 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class CollectionViewSet(viewsets.ModelViewSet):
+    serializer_class = CollectionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Collection.objects.filter(owner=self.request.user).order_by("name")
+
+    def perform_create(self, serializer):
+        serializer.save()

@@ -5,10 +5,10 @@ IFS=$'\n\t'
 
 # Config
 DJANGO_DIR="backend"
-ANGULAR_DIR="cookbook-app"
+FRONTEND_DIR="cookbook-app"
 DJANGO_PORT=8000
-ANGULAR_PORT=4200
-FRONTEND_MODE=${FRONTEND_MODE:-jwt}
+FRONTEND_PORT=8080
+ENV_FILE=${ENV_FILE:-dev_env}
 
 activate_venv() {
   if [[ -f "venv/bin/activate" ]]; then
@@ -23,36 +23,39 @@ start_backend() {
 
   activate_venv
 
+  if [[ -f "${ENV_FILE}" ]]; then
+    echo "[backend] Loading environment from ${ENV_FILE}..."
+    set -a
+    # shellcheck disable=SC1090
+    source "${ENV_FILE}"
+    set +a
+  fi
+
   echo "[backend] Installing Python deps..."
-  pip install -r requirements.txt
+  python3 -m pip install -r requirements.txt
 
   pushd "${DJANGO_DIR}" >/dev/null
 
   echo "[backend] Applying migrations..."
-  python manage.py makemigrations
-  python manage.py migrate
+  python3 manage.py makemigrations
+  python3 manage.py migrate
 
   echo "[backend] Running server on http://127.0.0.1:${DJANGO_PORT}/"
-  python manage.py runserver "${DJANGO_PORT}"
+  python3 manage.py runserver "${DJANGO_PORT}"
 
   popd >/dev/null
 }
 
 
 start_frontend() {
-  echo ">>> Starting Angular frontend in ./${ANGULAR_DIR}"
-  pushd "${ANGULAR_DIR}" >/dev/null
+  echo ">>> Starting frontend in ./${FRONTEND_DIR}"
+  pushd "${FRONTEND_DIR}" >/dev/null
 
   echo "[frontend] Installing NPM deps (only if needed)..."
   npm install
 
-  if [[ "${FRONTEND_MODE}" == "keycloak" ]]; then
-    echo "[frontend] Running Keycloak dev environment on http://127.0.0.1:${ANGULAR_PORT}/"
-    npm run start:keycloak -- --port "${ANGULAR_PORT}" --open
-  else
-    echo "[frontend] Running JWT dev environment on http://127.0.0.1:${ANGULAR_PORT}/"
-    ng serve --port "${ANGULAR_PORT}" --open
-  fi
+  echo "[frontend] Running Vite dev environment on http://127.0.0.1:${FRONTEND_PORT}/"
+  npm run dev -- --host 127.0.0.1 --port "${FRONTEND_PORT}"
 
   popd >/dev/null
 }

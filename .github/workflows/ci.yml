@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_ENGINE: sqlite
+      SECRET_KEY: ci-secret-key
+      DEBUG: "False"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: pip install -r ../requirements.txt
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+      - name: Run backend tests
+        run: python manage.py test users.tests.test_tag_inference recipes.tests_contract
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cookbook-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: cookbook-app/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run frontend unit tests
+        run: npm run test:unit -- --run
+      - name: Build frontend
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+    defaults:
+      run:
+        working-directory: cookbook-app
+    env:
+      DATABASE_ENGINE: sqlite
+      SECRET_KEY: ci-secret-key
+      DEBUG: "False"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: cookbook-app/package-lock.json
+      - name: Install backend dependencies
+        run: pip install -r ../requirements.txt
+        working-directory: backend
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run end-to-end tests
+        run: npm run test:e2e

@@ -1,17 +1,32 @@
 from django.contrib import admin
-from .models import Recipe, Tag, Ingredient, RecipeIngredient, Rating, Comment, Favorite
+from .models import (
+    Collection,
+    CollectionRecipe,
+    Comment,
+    Ingredient,
+    IngredientAlias,
+    Rating,
+    Recipe,
+    RecipeIngredient,
+    RecipeStep,
+    Tag,
+)
 
 class RecipeIngredientInline(admin.TabularInline):
     model = RecipeIngredient
     extra = 1
 
+class RecipeStepInline(admin.TabularInline):
+    model = RecipeStep
+    extra = 1
+
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ('title', 'created_by', 'created_at')
+    list_display = ('title', 'created_by', 'created_at', 'updated_at', 'is_side', 'is_sauce')
     search_fields = ('title', 'description', 'instructions', 'ingredients__name')
-    list_filter = ('tags',)
-    inlines = [RecipeIngredientInline]
-    filter_horizontal = ('tags',)
+    list_filter = ('tags', 'is_side', 'is_sauce')
+    inlines = [RecipeIngredientInline, RecipeStepInline]
+    filter_horizontal = ('tags', 'suggested_sides', 'suggested_sauces')
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
@@ -20,8 +35,13 @@ class TagAdmin(admin.ModelAdmin):
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ('name',)
+    list_display = ('name', 'parent')
     search_fields = ('name',)
+
+@admin.register(IngredientAlias)
+class IngredientAliasAdmin(admin.ModelAdmin):
+    list_display = ('alias_name', 'ingredient', 'normalized_alias')
+    search_fields = ('alias_name', 'ingredient__name', 'normalized_alias')
 
 @admin.register(Rating)
 class RatingAdmin(admin.ModelAdmin):
@@ -34,7 +54,12 @@ class CommentAdmin(admin.ModelAdmin):
     search_fields = ('text',)
     list_filter = ('created_at',)
 
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'owner', 'created_at', 'updated_at')
+    search_fields = ('name', 'owner__username')
 
-@admin.register(Favorite)
-class FavoriteAdmin(admin.ModelAdmin):
-    list_display = ('recipe', 'user', 'created_at')
+@admin.register(CollectionRecipe)
+class CollectionRecipeAdmin(admin.ModelAdmin):
+    list_display = ('collection', 'recipe')
+    search_fields = ('collection__name', 'recipe__title')

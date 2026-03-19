@@ -1,0 +1,13 @@
+SECRET_KEY=dev-secret-key-for-internal-testing-only-123456
+DEBUG=True
+ALLOWED_HOSTS=127.0.0.1,localhost,testserver
+CORS_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:4200,http://127.0.0.1:4200
+
+POSTGRES_DB=cookbook
+POSTGRES_USER=cookbook
+POSTGRES_PASSWORD=cookbook
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+
+AUTH_PROVIDER=jwt
+SEED_INTERNAL_DATA=0

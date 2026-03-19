@@ -4,12 +4,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from recipes.views import RecipeViewSet, TagViewSet, RatingViewSet, CommentViewSet, IngredientViewSet
+from recipes.views import CollectionViewSet, RecipeViewSet, TagViewSet, RatingViewSet, CommentViewSet, IngredientViewSet
 from users.views import UserRegisterView, UserDetailView
 
 
 router = DefaultRouter()
 router.register(r'recipes', RecipeViewSet)
+router.register(r'collections', CollectionViewSet, basename='collection')
 router.register(r'tags', TagViewSet)
 router.register(r'ratings', RatingViewSet)
 router.register(r'comments', CommentViewSet)

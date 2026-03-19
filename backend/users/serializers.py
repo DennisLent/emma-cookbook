@@ -5,20 +5,30 @@ from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     avatar = serializers.ImageField(required=False)
+    name = serializers.CharField(source='display_name', required=False)
+    avatarUrl = serializers.SerializerMethodField()
+    prefs = serializers.SerializerMethodField()
     theme = serializers.JSONField(required=False)
     layout = serializers.JSONField(required=False)
     widget_whitelist = serializers.JSONField(required=False)
+    favorite_recipe_ids = serializers.JSONField(required=False)
 
     class Meta:
         model = User
         fields = [
             'id',
             'username',
+            'email',
+            'display_name',
+            'name',
+            'avatarUrl',
+            'prefs',
             'first_name',
             'last_name',
             'bio',
             'avatar',
             'preferences',
+            'favorite_recipe_ids',
             'role',
             'theme',
             'layout',
@@ -26,13 +36,21 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'username', 'role']
 
+    def get_avatarUrl(self, obj):
+        return obj.avatar.url if obj.avatar else None
+
+    def get_prefs(self, obj):
+        return obj.preferences.get("prefs", {})
+
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     # require username + password
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, label="Confirm password")
+    name = serializers.CharField(source='display_name', required=False, allow_blank=True)
 
     # optional
+    email = serializers.EmailField(required=False, allow_blank=True)
     avatar = serializers.ImageField(required=False, allow_null=True)
     bio = serializers.CharField(required=False, allow_blank=True)
     preferences = serializers.JSONField(required=False)
@@ -44,6 +62,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'username', 'password', 'password2',
+            'email', 'display_name', 'name',
             'bio', 'avatar', 'preferences',
             'theme', 'layout', 'widget_whitelist'
         ]

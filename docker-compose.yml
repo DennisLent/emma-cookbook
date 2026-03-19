@@ -3,7 +3,7 @@ services:
   db:
     image: postgres:15
     env_file:
-      - .env
+      - ${ENV_FILE:-dev_env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -12,7 +12,7 @@ services:
   backend:
     build: ./backend
     env_file:
-      - .env
+      - ${ENV_FILE:-dev_env}
     depends_on:
       - db
     volumes:
