@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from recipes.views import CollectionViewSet, RecipeViewSet, TagViewSet, RatingViewSet, CommentViewSet, IngredientViewSet
@@ -16,7 +17,13 @@ router.register(r'ratings', RatingViewSet)
 router.register(r'comments', CommentViewSet)
 router.register(r'ingredients', IngredientViewSet)
 
+
+def root_redirect(_request):
+    return redirect('/admin/', permanent=False)
+
 urlpatterns = [
+    path('', root_redirect, name='root_redirect'),
+
     # admin path
     path('admin/', admin.site.urls),
 

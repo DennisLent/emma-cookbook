@@ -31,17 +31,21 @@ start_backend() {
     set +a
   fi
 
+  if [[ -z "${DATABASE_ENGINE:-}" ]]; then
+    export DATABASE_ENGINE=sqlite
+    echo "[backend] DATABASE_ENGINE not set; defaulting local run to sqlite."
+  fi
+
   echo "[backend] Installing Python deps..."
   python3 -m pip install -r requirements.txt
 
   pushd "${DJANGO_DIR}" >/dev/null
 
   echo "[backend] Applying migrations..."
-  python3 manage.py makemigrations
-  python3 manage.py migrate
+  python3 manage.py migrate --noinput
 
   echo "[backend] Running server on http://127.0.0.1:${DJANGO_PORT}/"
-  python3 manage.py runserver "${DJANGO_PORT}"
+  python3 manage.py runserver "127.0.0.1:${DJANGO_PORT}"
 
   popd >/dev/null
 }
