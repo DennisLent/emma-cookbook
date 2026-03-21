@@ -122,6 +122,40 @@ class SeedHelperTests(TestCase):
         with self.assertRaises(CommandError):
             seed_helpers.populate_database_for_user(username="missing-user")
 
+    def test_get_or_create_seed_ingredient_reuses_existing_slug_match(self):
+        existing = Ingredient.objects.create(name="extra-virgin olive oil")
+
+        resolved = seed_helpers.get_or_create_seed_ingredient("extra virgin olive oil")
+
+        self.assertEqual(resolved.pk, existing.pk)
+        self.assertEqual(Ingredient.objects.count(), 1)
+
+    @patch.object(seed_helpers, "parse_ingredient", side_effect=fake_parse_ingredient.__func__)
+    @patch.object(seed_helpers, "scrape_me")
+    @patch.object(seed_helpers, "SEED_RECIPES", new_callable=lambda: [])
+    def test_populate_database_for_user_reuses_ingredient_when_slug_collides(
+        self,
+        mock_seed_recipes,
+        mock_scrape_me,
+        _mock_parse_ingredient,
+    ):
+        Ingredient.objects.create(name="extra-virgin olive oil")
+        mock_seed_recipes.extend(
+            [{"url": "https://example.com/collision", "kind": "main", "extra_tags": ["Dinner"]}]
+        )
+        mock_scrape_me.return_value = FakeScraper(
+            title="Collision Pasta",
+            description="Recipe with normalized ingredient names",
+            instructions="Mix.\nCook.",
+            ingredients=["1 extra virgin olive oil", "2 garlic cloves"],
+        )
+
+        created = seed_helpers.populate_database_for_user(username="owner", reset=False)
+
+        self.assertEqual(len(created), 1)
+        self.assertEqual(Recipe.objects.get(title="Collision Pasta").recipe_ingredients.count(), 2)
+        self.assertEqual(Ingredient.objects.filter(slug="extra-virgin-olive-oil").count(), 1)
+
     def test_split_instructions_breaks_multiline_and_sentence_text(self):
         self.assertEqual(
             seed_helpers.split_instructions("First step.\nSecond step."),

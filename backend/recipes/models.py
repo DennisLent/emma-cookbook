@@ -125,9 +125,11 @@ class RecipeImportJob(models.Model):
 
     PLATFORM_INSTAGRAM = "instagram"
     PLATFORM_TIKTOK = "tiktok"
+    PLATFORM_YOUTUBE = "youtube"
     PLATFORM_CHOICES = (
         (PLATFORM_INSTAGRAM, "Instagram"),
         (PLATFORM_TIKTOK, "TikTok"),
+        (PLATFORM_YOUTUBE, "YouTube"),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recipe_import_jobs")

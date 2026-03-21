@@ -4,6 +4,8 @@ from urllib.parse import urlparse
 from django.contrib.auth import get_user_model
 from django.core.management.base import CommandError
 from django.db import connection, transaction
+from django.db.models import Q
+from django.utils.text import slugify
 
 from ingredient_parser import parse_ingredient
 from recipe_scrapers import scrape_me
@@ -55,15 +57,12 @@ SEED_RECIPES = [
     {"url": "https://www.twopeasandtheirpod.com/grilled-vegetable-pasta-salad/", "kind": "side", "extra_tags": ["Pasta", "Salad", "Sides", "Lunch"]},
     {"url": "https://www.twopeasandtheirpod.com/baked-ziti/", "kind": "main", "extra_tags": ["Pasta", "Dinner"]},
     {"url": "https://www.twopeasandtheirpod.com/pasta-primavera/", "kind": "main", "extra_tags": ["Vegetarian", "Pasta", "Dinner"]},
-    {"url": "https://www.recipetineats.com/lemon-potatoes/", "kind": "side", "extra_tags": ["Sides"]},
     {"url": "https://www.recipetineats.com/roasted-vegetables/", "kind": "side", "extra_tags": ["Sides", "Vegetarian"]},
     {"url": "https://www.loveandlemons.com/roasted-brussels-sprouts/", "kind": "side", "extra_tags": ["Sides", "Vegetarian"]},
     {"url": "https://www.loveandlemons.com/focaccia/", "kind": "side", "extra_tags": ["Sides"]},
     {"url": "https://www.twopeasandtheirpod.com/garlic-bread/", "kind": "side", "extra_tags": ["Sides"]},
     {"url": "https://www.recipetineats.com/honey-mustard-dressing/", "kind": "sauce", "extra_tags": ["Sauce"]},
     {"url": "https://www.recipetineats.com/pesto/", "kind": "sauce", "extra_tags": ["Sauce"]},
-    {"url": "https://www.recipetineats.com/tartare-sauce/", "kind": "sauce", "extra_tags": ["Sauce"]},
-    {"url": "https://www.recipetineats.com/bechamel-sauce/", "kind": "sauce", "extra_tags": ["Sauce"]},
     {"url": "https://www.loveandlemons.com/tzatziki-sauce/", "kind": "sauce", "extra_tags": ["Sauce"]},
     {"url": "https://www.loveandlemons.com/chimichurri/", "kind": "sauce", "extra_tags": ["Sauce"]},
     {"url": "https://www.loveandlemons.com/tahini-sauce/", "kind": "sauce", "extra_tags": ["Sauce"]},
@@ -182,6 +181,19 @@ def source_name_from_url(url: str) -> str:
     return host
 
 
+def get_or_create_seed_ingredient(name: str) -> Ingredient:
+    normalized_name = name.strip()
+    normalized_slug = slugify(normalized_name)
+
+    existing = Ingredient.objects.filter(
+        Q(name__iexact=normalized_name) | Q(slug=normalized_slug)
+    ).order_by("id").first()
+    if existing is not None:
+        return existing
+
+    return Ingredient.objects.create(name=normalized_name)
+
+
 def reset_recipe_data():
     if connection.vendor == "postgresql":
         with transaction.atomic():
@@ -273,7 +285,7 @@ def populate_database_for_user(username: str, stdout=None, reset=False):
                 name = parsed.name[0].text.strip() if parsed.name else raw.strip()
                 amount_str = parsed.amount[0].text.strip() if parsed.amount else raw.strip()
 
-                ingredient_obj, _ = Ingredient.objects.get_or_create(name__iexact=name, defaults={"name": name})
+                ingredient_obj = get_or_create_seed_ingredient(name)
                 RecipeIngredient.objects.create(
                     recipe=recipe,
                     ingredient=ingredient_obj,

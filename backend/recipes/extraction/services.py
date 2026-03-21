@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from .utils import (
     get_yt_transcript_cleaned,
     extract_recipe_via_ollama,
@@ -102,7 +104,8 @@ def extract_recipe_from_website(url: str) -> dict:
         "image": None,
     }
 
-def extract_recipe_from_youtube(url: str, model: str = "llama3.2") -> dict | None:
+def extract_recipe_from_youtube(url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
     transcript = get_yt_transcript_cleaned(url)
     if len(transcript.split()) < 50:
         return None
@@ -111,7 +114,8 @@ def extract_recipe_from_youtube(url: str, model: str = "llama3.2") -> dict | Non
     return build_recipe_payload_from_details(details=details, source_url=url)
 
 
-def extract_recipe_from_transcript(transcript: str, source_url: str, model: str = "llama3.2") -> dict | None:
+def extract_recipe_from_transcript(transcript: str, source_url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
     if not transcript or len(transcript.split()) < 50:
         return None
 
@@ -119,7 +123,8 @@ def extract_recipe_from_transcript(transcript: str, source_url: str, model: str 
     return build_recipe_payload_from_details(details=details, source_url=source_url)
 
 
-def extract_recipe_from_instagram(url: str, model: str = "llama3.2") -> dict | None:
+def extract_recipe_from_instagram(url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
     platform = validate_public_video_url(url)
     if platform != "instagram":
         raise ValueError("The provided URL is not a supported Instagram URL.")
@@ -131,7 +136,8 @@ def extract_recipe_from_instagram(url: str, model: str = "llama3.2") -> dict | N
         return extract_recipe_from_transcript(transcript=transcript, source_url=url, model=model)
 
 
-def extract_recipe_from_tiktok(url: str, model: str = "llama3.2") -> dict | None:
+def extract_recipe_from_tiktok(url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
     platform = validate_public_video_url(url)
     if platform != "tiktok":
         raise ValueError("The provided URL is not a supported TikTok URL.")

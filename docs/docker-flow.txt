@@ -1,29 +1,31 @@
-- Create backend container
-    - Install python dependencies
-    - Create superuser from cli
-    - Load existing database? y/n
-        If yes -> point to database location and load
-    - Seed data from db? y/n
-        If yes --> seed data and use create superuser for recipes
-    - Install ollama
-        - Ask which model to use as default
-    - Install ffmpeg
-    - Ask for specific vosk model (if wanted) save in backend/recipes/extraction/utils
-        - Else install: https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip
+Docker production flow is now driven by:
 
+```sh
+./scripts/setup_docker_production.sh
+```
 
-- Create frontend container
-    - Install npm dependencies
+The interactive script asks for:
+- production env file location
+- public app URL and allowed hosts
+- PostgreSQL credentials
+- Django superuser credentials
+- whether to import an existing backup (`.sql` or JSON app backup)
+- whether to seed recipe data
+- whether to run Ollama in Docker and which model to pull
+- which Vosk model directory or zip URL to use
+- JWT vs Keycloak settings
 
-- Configure Keycloak
-    - Create realm and public client for the web app
-    - Set valid redirect URIs to http://localhost:4200/* and silent-check-sso.html
-    - Expose realm OIDC issuer and JWKS endpoints
-    - Provide .env values for backend verification
+What it does:
+- writes the chosen production env file
+- prepares a persisted Vosk model in `docker-data/vosk`
+- builds the Docker images
+- starts Postgres and Redis first
+- optionally starts Ollama and pulls the selected model
+- optionally imports an existing database backup
+- runs migrations and creates or updates the Django superuser
+- optionally seeds recipe data
+- starts backend, worker, and frontend containers
 
-- Choose auth provider
-    - Local dev uses JWT by default (ng serve development)
-    - To run with Keycloak locally: npm run start:keycloak
-    - Production can be built with either provider by editing environment.prod.ts (authProvider)
-
-- Run hehe
+Keycloak notes:
+- realm/client creation is still manual
+- the script only collects and writes the backend env values

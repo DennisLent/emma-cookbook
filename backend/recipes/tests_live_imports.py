@@ -50,6 +50,12 @@ class LiveRecipeImportSmokeTests(APITestCase):
             format="json",
         )
 
+        if response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+            payload = response.json()
+            reason = payload.get("error", {}).get("details", {}).get("reason", "")
+            if "YouTube is blocking requests from your IP" in reason:
+                raise SkipTest("YouTube transcript access was blocked for the current runner IP.")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         payload = response.json()
         self.assertEqual(payload["title"], "Smoke Test Recipe")

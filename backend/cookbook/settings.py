@@ -263,6 +263,7 @@ KEYCLOAK_JWKS_URL = config(
     default=f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
 )
 KEYCLOAK_ADMIN_ROLE = config('KEYCLOAK_ADMIN_ROLE', default='cookbook-admin')
+OLLAMA_DEFAULT_MODEL = config('OLLAMA_DEFAULT_MODEL', default='llama3.2')
 
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=CELERY_BROKER_URL)
@@ -280,5 +281,5 @@ RECIPE_IMPORT_DOWNLOAD_TIMEOUT_SECONDS = config('RECIPE_IMPORT_DOWNLOAD_TIMEOUT_
 RECIPE_IMPORT_ALLOWED_HOSTS = config(
     'RECIPE_IMPORT_ALLOWED_HOSTS',
     cast=Csv(),
-    default='instagram.com,www.instagram.com,m.instagram.com,tiktok.com,www.tiktok.com,m.tiktok.com,vm.tiktok.com',
+    default='instagram.com,www.instagram.com,m.instagram.com,tiktok.com,www.tiktok.com,m.tiktok.com,vm.tiktok.com,youtube.com,www.youtube.com,m.youtube.com,youtu.be',
 )

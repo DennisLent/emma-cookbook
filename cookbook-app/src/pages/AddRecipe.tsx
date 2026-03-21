@@ -29,7 +29,7 @@ type RecipeImportJobResult = {
 type RecipeImportJob = {
   id: number;
   status: "queued" | "running" | "done" | "failed";
-  platform: "instagram" | "tiktok";
+  platform: "instagram" | "tiktok" | "youtube";
   sourceUrl: string;
   errorCode?: string;
   errorMessage?: string;
@@ -179,7 +179,7 @@ export default function AddRecipe() {
 
   const startImportFromLink = async () => {
     if (!sourceUrl.trim()) {
-      toast({ title: "Paste an Instagram or TikTok URL first", variant: "destructive" });
+      toast({ title: "Paste a YouTube, Instagram, or TikTok URL first", variant: "destructive" });
       return;
     }
 
@@ -288,7 +288,9 @@ export default function AddRecipe() {
 
   const videoEmbed = sourceUrl ? getVideoEmbed(sourceUrl) : null;
   const importIsActive = importJob?.status === "queued" || importJob?.status === "running";
-  const canImportFromLink = Boolean(videoEmbed?.type === "instagram" || videoEmbed?.type === "tiktok");
+  const canImportFromLink = Boolean(
+    videoEmbed?.type === "instagram" || videoEmbed?.type === "tiktok" || videoEmbed?.type === "youtube"
+  );
 
   const RecipeForm = ({ idPrefix = "" }: { idPrefix?: string }) => (
     <div className="space-y-6">
@@ -603,7 +605,7 @@ export default function AddRecipe() {
                     placeholder="Paste YouTube, Instagram, TikTok, or website URL"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Paste a public Instagram or TikTok URL to import ingredients and steps automatically. Website links can still be saved manually.
+                    Paste a public YouTube, Instagram, or TikTok URL to import ingredients and steps automatically. Website links can still be saved manually.
                   </p>
                 </div>
 
@@ -618,7 +620,7 @@ export default function AddRecipe() {
                   </Button>
                   {!canImportFromLink && sourceUrl.trim() && (
                     <p className="text-sm text-muted-foreground">
-                      Automatic import currently supports public Instagram and TikTok URLs only.
+                      Automatic import currently supports public YouTube, Instagram, and TikTok URLs only.
                     </p>
                   )}
                 </div>

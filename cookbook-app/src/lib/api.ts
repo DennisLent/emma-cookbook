@@ -115,6 +115,36 @@ export async function apiRequest<T>(
   return (await response.json()) as T;
 }
 
+export async function apiDownload(
+  path: string,
+  init: RequestInit = {},
+  retryOnAuthFailure = true,
+): Promise<Blob> {
+  const headers = new Headers(init.headers || {});
+  const access = getAccessToken();
+  if (access) {
+    headers.set("Authorization", `Bearer ${access}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+  });
+
+  if (response.status === 401 && retryOnAuthFailure) {
+    const newAccess = await refreshAccessToken();
+    if (newAccess) {
+      return apiDownload(path, init, false);
+    }
+  }
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  return await response.blob();
+}
+
 export function getApiErrorMessage(error: unknown, fallback = "Request failed.") {
   if (error && typeof error === "object" && "message" in error) {
     const message = (error as { message?: unknown }).message;

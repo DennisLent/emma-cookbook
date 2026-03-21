@@ -6,7 +6,7 @@ from django.shortcuts import redirect
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from recipes.views import CollectionViewSet, RecipeImportJobViewSet, RecipeViewSet, TagViewSet, RatingViewSet, CommentViewSet, IngredientViewSet
-from users.views import UserRegisterView, UserDetailView
+from users.views import DatabaseExportView, DatabaseImportView, UserRegisterView, UserDetailView
 
 
 router = DefaultRouter()
@@ -36,6 +36,8 @@ urlpatterns = [
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/register/', UserRegisterView.as_view(), name='auth_register'),
     path('api/users/me/', UserDetailView.as_view(), name='user_detail'),
+    path('api/database/export/', DatabaseExportView.as_view(), name='database_export'),
+    path('api/database/import/', DatabaseImportView.as_view(), name='database_import'),
 ]
 
 # uploads for images

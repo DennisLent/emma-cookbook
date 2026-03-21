@@ -1,10 +1,12 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from recipes.extraction.utils import validate_public_video_url
 from recipes.models import RecipeImportJob
 
 
@@ -41,6 +43,20 @@ class RecipeImportJobApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["error"]["code"], "unsupported_host")
+
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_accepts_youtube_url(self, delay_mock):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.youtube.com/watch?v=HILQ80TNyCk"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        job = RecipeImportJob.objects.get()
+        self.assertEqual(job.platform, RecipeImportJob.PLATFORM_YOUTUBE)
+        delay_mock.assert_called_once_with(job.pk)
 
     def test_retrieve_recipe_import_job_is_scoped_to_request_user(self):
         other_user = get_user_model().objects.create_user(username="other", password="secret123")
@@ -129,3 +145,30 @@ class RecipeImportJobTaskTests(APITestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, RecipeImportJob.STATUS_FAILED)
         self.assertEqual(job.error_code, "authentication_required")
+
+
+class PublicVideoValidationTests(APITestCase):
+    @override_settings(
+        RECIPE_IMPORT_ALLOWED_HOSTS=[
+            "instagram.com",
+            "www.instagram.com",
+            "m.instagram.com",
+            "tiktok.com",
+            "www.tiktok.com",
+            "m.tiktok.com",
+            "vm.tiktok.com",
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "youtu.be",
+        ]
+    )
+    def test_validate_public_video_url_accepts_youtube_hosts(self):
+        self.assertEqual(
+            validate_public_video_url("https://www.youtube.com/watch?v=HILQ80TNyCk"),
+            "youtube",
+        )
+        self.assertEqual(
+            validate_public_video_url("https://youtu.be/HILQ80TNyCk"),
+            "youtube",
+        )

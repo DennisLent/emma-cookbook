@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   db:
     image: postgres:15
@@ -15,7 +14,9 @@ services:
       - "6379:6379"
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
       - ${ENV_FILE:-dev_env}
     depends_on:
@@ -23,11 +24,17 @@ services:
       - redis
     volumes:
       - ./backend/media:/app/media
+      - ./docker-data/vosk:/app/vosk-model
+      - ./docker-data/bootstrap:/bootstrap
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
 
   worker:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A cookbook worker -l info
     env_file:
       - ${ENV_FILE:-dev_env}
@@ -36,6 +43,19 @@ services:
       - redis
     volumes:
       - ./backend/media:/app/media
+      - ./docker-data/vosk:/app/vosk-model
+      - ./docker-data/bootstrap:/bootstrap
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
 
   frontend:
     build:
@@ -48,3 +68,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

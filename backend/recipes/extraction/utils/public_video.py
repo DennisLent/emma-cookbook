@@ -29,7 +29,9 @@ def infer_supported_platform(video_url: str) -> str:
         return "instagram"
     if hostname in {"tiktok.com", "m.tiktok.com", "vm.tiktok.com"}:
         return "tiktok"
-    raise PublicVideoDownloadError("unsupported_platform", "Only public Instagram and TikTok URLs are supported.")
+    if hostname in {"youtube.com", "m.youtube.com", "youtu.be"}:
+        return "youtube"
+    raise PublicVideoDownloadError("unsupported_platform", "Only public Instagram, TikTok, and YouTube URLs are supported.")
 
 
 def validate_public_video_url(video_url: str) -> str:

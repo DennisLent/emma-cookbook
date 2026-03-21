@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import viewsets, permissions, status
 from .models import Recipe, RecipeImportJob, Tag, Rating, Comment, Ingredient
 from .serializers import CollectionSerializer, RecipeImportJobCreateSerializer, RecipeImportJobSerializer, RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
@@ -246,7 +247,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            data = extract_recipe_from_youtube(video_url, model="llama3.2")
+            data = extract_recipe_from_youtube(video_url, model=settings.OLLAMA_DEFAULT_MODEL)
         except Exception as e:
             traceback.print_exc()
             return error_response(

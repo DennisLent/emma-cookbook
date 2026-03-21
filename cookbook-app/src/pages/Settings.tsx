@@ -2,39 +2,54 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRecipes } from "@/hooks/useRecipes";
 import { toast } from "@/hooks/use-toast";
-import { Recipe } from "@/types/recipe";
+import { apiDownload, apiRequest, getApiErrorMessage } from "@/lib/api";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { exportRecipes, importRecipes } = useRecipes();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
-    exportRecipes();
-    toast({ title: "Recipes exported" });
+  const handleExport = async () => {
+    try {
+      const blob = await apiDownload("/database/export/");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `cookbook-backup-${new Date().toISOString().split("T")[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Database backup exported" });
+    } catch (error) {
+      toast({
+        title: "Failed to export backup",
+        description: getApiErrorMessage(error, "The database backup could not be exported."),
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string) as Recipe[];
-        if (Array.isArray(data)) {
-          importRecipes(data);
-          toast({ title: "Recipes imported successfully" });
-        } else {
-          toast({ title: "Invalid file format", variant: "destructive" });
-        }
-      } catch {
-        toast({ title: "Failed to import recipes", variant: "destructive" });
-      }
-    };
-    reader.readAsText(file);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await apiRequest("/database/import/", {
+        method: "POST",
+        body: formData,
+      });
+      toast({ title: "Database backup imported successfully" });
+      window.location.reload();
+    } catch (error) {
+      toast({
+        title: "Failed to import backup",
+        description: getApiErrorMessage(error, "The database backup could not be imported."),
+        variant: "destructive",
+      });
+    } finally {
+      e.target.value = "";
+    }
   };
 
   return (
@@ -55,9 +70,9 @@ export default function Settings() {
           <h2 className="text-lg font-semibold">Backup & Restore</h2>
           
           <div className="flex flex-col gap-3">
-            <Button variant="outline" onClick={handleExport} className="justify-start">
+            <Button variant="outline" onClick={() => void handleExport()} className="justify-start">
               <Download className="w-4 h-4 mr-2" />
-              Export Recipes (JSON)
+              Export Database Backup (JSON)
             </Button>
 
             <input
@@ -73,12 +88,12 @@ export default function Settings() {
               className="justify-start"
             >
               <Upload className="w-4 h-4 mr-2" />
-              Import Recipes (JSON)
+              Import Database Backup (JSON)
             </Button>
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Export your recipes to back them up, or import recipes from a JSON file.
+            Export or restore the backend app data as a JSON backup. This is intended for admin/local maintenance workflows.
           </p>
         </section>
       </main>
