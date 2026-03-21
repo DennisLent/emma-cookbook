@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, X, Upload, Link, ExternalLink, Salad, Droplets } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, X, Upload, Link, ExternalLink, Salad, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,9 +12,53 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useRecipes } from "@/hooks/useRecipes";
 import { Ingredient, Step, Recipe } from "@/types/recipe";
 import { toast } from "@/hooks/use-toast";
-import { getApiErrorMessage } from "@/lib/api";
+import { apiRequest, getApiErrorMessage } from "@/lib/api";
 import SortableStepList from "@/components/SortableStepList";
 import SearchableRecipeSelect from "@/components/SearchableRecipeSelect";
+
+type RecipeImportJobResult = {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  ingredients_data?: Array<{
+    ingredient?: string;
+    amount?: string;
+  }>;
+};
+
+type RecipeImportJob = {
+  id: number;
+  status: "queued" | "running" | "done" | "failed";
+  platform: "instagram" | "tiktok";
+  sourceUrl: string;
+  errorCode?: string;
+  errorMessage?: string;
+  result?: RecipeImportJobResult;
+};
+
+function splitImportedInstructions(raw: string | undefined) {
+  if (!raw) return [{ order: 1, text: "" }];
+
+  const lines = raw
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return [{ order: 1, text: "" }];
+  }
+
+  return lines.map((text, index) => ({
+    order: index + 1,
+    text,
+  }));
+}
+
+function isLikelySourceUrl(value: string | undefined, sourceUrl: string) {
+  if (!value) return false;
+  const normalized = value.trim();
+  return normalized === sourceUrl || /^https?:\/\//i.test(normalized);
+}
 
 export default function AddRecipe() {
   const navigate = useNavigate();
@@ -35,6 +79,9 @@ export default function AddRecipe() {
   const [isSauce, setIsSauce] = useState(false);
   const [suggestedSideIds, setSuggestedSideIds] = useState<string[]>([]);
   const [suggestedSauceIds, setSuggestedSauceIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("manual");
+  const [importJob, setImportJob] = useState<RecipeImportJob | null>(null);
+  const [isStartingImport, setIsStartingImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sideRecipes = recipes.filter((r) => r.isSide);
@@ -103,6 +150,93 @@ export default function AddRecipe() {
     return null;
   };
 
+  const applyImportedRecipe = (job: RecipeImportJob) => {
+    const result = job.result;
+    if (!result) return;
+
+    setSourceUrl(job.sourceUrl);
+    if (result.title?.trim()) {
+      setTitle(result.title.trim());
+    }
+
+    if (result.description?.trim() && !isLikelySourceUrl(result.description, job.sourceUrl)) {
+      setDescription(result.description.trim());
+    }
+
+    const importedIngredients = (result.ingredients_data || [])
+      .map((entry) => ({
+        qty: entry.amount?.trim() || "",
+        item: entry.ingredient?.trim() || "",
+      }))
+      .filter((entry) => entry.item);
+
+    if (importedIngredients.length > 0) {
+      setIngredients(importedIngredients);
+    }
+
+    setSteps(splitImportedInstructions(result.instructions));
+  };
+
+  const startImportFromLink = async () => {
+    if (!sourceUrl.trim()) {
+      toast({ title: "Paste an Instagram or TikTok URL first", variant: "destructive" });
+      return;
+    }
+
+    setIsStartingImport(true);
+    try {
+      const job = await apiRequest<RecipeImportJob>("/recipe-import-jobs/", {
+        method: "POST",
+        body: JSON.stringify({ url: sourceUrl.trim() }),
+      });
+      setImportJob(job);
+      toast({ title: "Import started", description: "We are downloading and transcribing the video now." });
+    } catch (error) {
+      toast({
+        title: "Failed to start import",
+        description: getApiErrorMessage(error, "The video import job could not be created."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsStartingImport(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!importJob || importJob.status === "done" || importJob.status === "failed") {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const nextJob = await apiRequest<RecipeImportJob>(`/recipe-import-jobs/${importJob.id}/`);
+        setImportJob(nextJob);
+
+        if (nextJob.status === "done") {
+          applyImportedRecipe(nextJob);
+          window.clearInterval(interval);
+          toast({ title: "Recipe imported", description: "You can review and edit the imported recipe before saving." });
+        } else if (nextJob.status === "failed") {
+          window.clearInterval(interval);
+          toast({
+            title: "Import failed",
+            description: nextJob.errorMessage || "The importer could not process this public video URL.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        window.clearInterval(interval);
+        toast({
+          title: "Import status check failed",
+          description: getApiErrorMessage(error, "The import job status could not be refreshed."),
+          variant: "destructive",
+        });
+      }
+    }, 3000);
+
+    return () => window.clearInterval(interval);
+  }, [importJob]);
+
   const handleSubmit = async () => {
     if (!title.trim()) {
       toast({ title: "Title is required", variant: "destructive" });
@@ -153,6 +287,8 @@ export default function AddRecipe() {
   };
 
   const videoEmbed = sourceUrl ? getVideoEmbed(sourceUrl) : null;
+  const importIsActive = importJob?.status === "queued" || importJob?.status === "running";
+  const canImportFromLink = Boolean(videoEmbed?.type === "instagram" || videoEmbed?.type === "tiktok");
 
   const RecipeForm = ({ idPrefix = "" }: { idPrefix?: string }) => (
     <div className="space-y-6">
@@ -435,7 +571,7 @@ export default function AddRecipe() {
 
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-6">
-        <Tabs defaultValue="manual" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
             <TabsTrigger value="link">From Link</TabsTrigger>
@@ -460,13 +596,46 @@ export default function AddRecipe() {
                     id="sourceUrl"
                     type="url"
                     value={sourceUrl}
-                    onChange={(e) => setSourceUrl(e.target.value)}
+                    onChange={(e) => {
+                      setSourceUrl(e.target.value);
+                      setImportJob(null);
+                    }}
                     placeholder="Paste YouTube, Instagram, TikTok, or website URL"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Paste a link to save it with your recipe. You'll need to enter the ingredients and steps manually.
+                    Paste a public Instagram or TikTok URL to import ingredients and steps automatically. Website links can still be saved manually.
                   </p>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={startImportFromLink}
+                    disabled={isStartingImport || importIsActive || !canImportFromLink}
+                  >
+                    {(isStartingImport || importIsActive) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Import Recipe
+                  </Button>
+                  {!canImportFromLink && sourceUrl.trim() && (
+                    <p className="text-sm text-muted-foreground">
+                      Automatic import currently supports public Instagram and TikTok URLs only.
+                    </p>
+                  )}
+                </div>
+
+                {importJob && (
+                  <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                    <p className="text-sm font-medium">
+                      Import status: {importJob.status}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {importJob.status === "queued" && "Your video import is queued and waiting for a worker."}
+                      {importJob.status === "running" && "We are downloading the video, extracting audio, and transcribing it."}
+                      {importJob.status === "done" && "Imported fields have been filled in below. Review them before saving."}
+                      {importJob.status === "failed" && (importJob.errorMessage || "The importer could not process this video.")}
+                    </p>
+                  </div>
+                )}
 
                 {/* Video Preview */}
                 {videoEmbed?.type === "youtube" && (

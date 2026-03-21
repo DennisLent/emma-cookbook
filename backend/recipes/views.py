@@ -1,12 +1,14 @@
 from rest_framework import viewsets, permissions, status
-from .models import Recipe, Tag, Rating, Comment, Ingredient
-from .serializers import CollectionSerializer, RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
+from .models import Recipe, RecipeImportJob, Tag, Rating, Comment, Ingredient
+from .serializers import CollectionSerializer, RecipeImportJobCreateSerializer, RecipeImportJobSerializer, RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
 import random
 from django.db.models import Avg, Case, FloatField, IntegerField, Value, When
 from django.db.models.functions import Coalesce
 from django.db import transaction
+from django.db.transaction import on_commit
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from .meal_plan import generate_balanced_meal_plan, generate_meal_plan, swap_recipe
 from .models import Collection
 from cookbook.api_errors import error_response
@@ -265,13 +267,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path="preview/instagram", permission_classes=[permissions.IsAuthenticated])
     def get_from_instagram(self, request):
-        """Preview a recipe from an Instagram Reel."""
-        from .extraction.services import extract_recipe_from_instagram
-        from .extraction.utils.instagram import InstagramCheckpointRequired
-
-        video_url   = request.data.get('video_url')
-        ig_username = request.data.get('ig_username')
-        ig_password = request.data.get('ig_password')
+        """Deprecated synchronous endpoint retained for API clarity."""
+        video_url = request.data.get('video_url')
 
         if not video_url:
             return error_response(
@@ -281,37 +278,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 details={"field": "video_url"},
             )
 
-        try:
-            data = extract_recipe_from_instagram(
-                video_url,
-                model="llama3.2",
-                ig_username=ig_username,
-                ig_password=ig_password,
-            )
-        except InstagramCheckpointRequired as e:
-            return error_response(
-                code="instagram_checkpoint_required",
-                message=str(e),
-                http_status=status.HTTP_403_FORBIDDEN,
-                details={"challenge_url": e.challenge_url},
-            )
-        except Exception as e:
-            traceback.print_exc()
-            return error_response(
-                code="instagram_preview_failed",
-                message="The backend could not extract recipe data from the provided Instagram video.",
-                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                details={"reason": str(e)},
-            )
-
-        if data is None:
-            return error_response(
-                code="instagram_recipe_not_found",
-                message="No recipe data could be found in the provided Instagram video.",
-                http_status=status.HTTP_404_NOT_FOUND,
-            )
-
-        return Response(data)
+        return error_response(
+            code="instagram_async_required",
+            message="Instagram imports now run asynchronously. Create a recipe import job and poll its status instead.",
+            http_status=status.HTTP_409_CONFLICT,
+            details={"field": "video_url", "source_url": video_url},
+        )
 
     @action(detail=True, methods=['post', 'delete', 'get'], url_path='favorite', permission_classes=[permissions.IsAuthenticated])
     def favorite(self, request, pk=None):
@@ -345,7 +317,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             'is_favorited': False,
             'favorites_count': RecipeSerializer(recipe, context={"request": request}).data["favorites_count"],
         }, status=status.HTTP_200_OK)
-
     @action(detail=True, methods=['post'], url_path='rate', permission_classes=[permissions.IsAuthenticated])
     def rate(self, request, pk=None):
         """Create or update the current user's rating for this recipe."""
@@ -411,6 +382,64 @@ class RatingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class RecipeImportJobViewSet(viewsets.GenericViewSet):
+    serializer_class = RecipeImportJobSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "recipe_import_jobs"
+
+    def get_queryset(self):
+        return RecipeImportJob.objects.filter(user=self.request.user).order_by("-created_at")
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return RecipeImportJobCreateSerializer
+        return RecipeImportJobSerializer
+
+    def list(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self.get_queryset()[:50], many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self.get_object())
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        from .extraction.utils import PublicVideoDownloadError, validate_public_video_url
+        from .tasks import process_recipe_import_job
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        source_url = serializer.validated_data["url"]
+
+        try:
+            platform = validate_public_video_url(source_url)
+        except PublicVideoDownloadError as exc:
+            return error_response(
+                code=exc.code,
+                message=exc.message,
+                http_status=status.HTTP_400_BAD_REQUEST,
+                details={"field": "url"},
+            )
+
+        job = RecipeImportJob.objects.create(
+            user=request.user,
+            source_url=source_url,
+            platform=platform,
+            status=RecipeImportJob.STATUS_QUEUED,
+        )
+
+        def enqueue():
+            process_recipe_import_job.delay(job.pk)
+
+        on_commit(enqueue)
+
+        return Response(
+            RecipeImportJobSerializer(job, context={"request": request}).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class CommentViewSet(viewsets.ModelViewSet):

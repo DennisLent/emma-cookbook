@@ -1,0 +1,70 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from celery import shared_task
+from django.core.files import File
+from django.db import transaction
+from django.utils import timezone
+
+from .extraction.services import extract_recipe_from_transcript
+from .extraction.utils import (
+    PublicVideoDownloadError,
+    download_public_video,
+    extract_audio_from_video,
+    normalize_transcript_text,
+    transcribe_wav_with_vosk,
+)
+from .models import RecipeImportJob
+
+
+@shared_task(bind=True, autoretry_for=(), retry_backoff=False)
+def process_recipe_import_job(self, job_id: int):
+    job = RecipeImportJob.objects.get(pk=job_id)
+    job.status = RecipeImportJob.STATUS_RUNNING
+    job.started_at = timezone.now()
+    job.finished_at = None
+    job.error_code = ""
+    job.error_message = ""
+    job.celery_task_id = self.request.id or ""
+    job.save(update_fields=["status", "started_at", "finished_at", "error_code", "error_message", "celery_task_id", "updated_at"])
+
+    try:
+        with TemporaryDirectory(prefix=f"recipe-import-{job.pk}-") as tmpdir:
+            video_path, file_size = download_public_video(job.source_url, tmpdir)
+            audio_path = extract_audio_from_video(video_path)
+            transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
+            extracted_recipe = extract_recipe_from_transcript(transcript=transcript, source_url=job.source_url)
+
+            if extracted_recipe is None:
+                raise PublicVideoDownloadError(
+                    "recipe_not_found",
+                    "No recipe data could be extracted from the video's transcript.",
+                )
+
+            with transaction.atomic():
+                with open(video_path, "rb") as video_handle:
+                    job.media_file.save(Path(video_path).name, File(video_handle), save=False)
+                with open(audio_path, "rb") as audio_handle:
+                    job.audio_file.save(Path(audio_path).name, File(audio_handle), save=False)
+
+                job.file_size_bytes = file_size
+                job.transcript = transcript
+                job.extracted_recipe = extracted_recipe
+                job.status = RecipeImportJob.STATUS_DONE
+                job.finished_at = timezone.now()
+                job.save()
+
+    except PublicVideoDownloadError as exc:
+        job.status = RecipeImportJob.STATUS_FAILED
+        job.error_code = exc.code
+        job.error_message = exc.message
+        job.finished_at = timezone.now()
+        job.save(update_fields=["status", "error_code", "error_message", "finished_at", "updated_at"])
+        raise
+    except Exception as exc:
+        job.status = RecipeImportJob.STATUS_FAILED
+        job.error_code = "unexpected_error"
+        job.error_message = str(exc)
+        job.finished_at = timezone.now()
+        job.save(update_fields=["status", "error_code", "error_message", "finished_at", "updated_at"])
+        raise

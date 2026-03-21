@@ -8,6 +8,7 @@ from .models import (
     IngredientAlias,
     Rating,
     Recipe,
+    RecipeImportJob,
     RecipeIngredient,
     RecipeStep,
     Tag,
@@ -149,3 +150,12 @@ class CollectionRecipeAdmin(admin.ModelAdmin):
     list_display = ("collection", "recipe")
     search_fields = ("collection__name", "recipe__title")
     autocomplete_fields = ("collection", "recipe")
+
+
+@admin.register(RecipeImportJob)
+class RecipeImportJobAdmin(admin.ModelAdmin):
+    list_display = ("id", "platform", "user", "status", "created_at", "started_at", "finished_at")
+    list_filter = ("platform", "status", "created_at")
+    search_fields = ("source_url", "user__username", "error_code", "error_message")
+    autocomplete_fields = ("user",)
+    readonly_fields = ("created_at", "updated_at", "started_at", "finished_at")

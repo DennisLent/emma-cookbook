@@ -12,6 +12,7 @@ from .models import (
     IngredientAlias,
     Rating,
     Recipe,
+    RecipeImportJob,
     RecipeIngredient,
     RecipeStep,
     Tag,
@@ -413,3 +414,57 @@ class CollectionSerializer(serializers.ModelSerializer):
             for recipe in recipes:
                 CollectionRecipe.objects.get_or_create(collection=instance, recipe=recipe)
         return instance
+
+
+class RecipeImportJobCreateSerializer(serializers.Serializer):
+    url = serializers.URLField(max_length=1000)
+
+
+class RecipeImportJobSerializer(serializers.ModelSerializer):
+    mediaUrl = serializers.SerializerMethodField()
+    audioUrl = serializers.SerializerMethodField()
+    result = serializers.JSONField(source="extracted_recipe", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+    updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+    startedAt = serializers.DateTimeField(source="started_at", read_only=True)
+    finishedAt = serializers.DateTimeField(source="finished_at", read_only=True)
+    sourceUrl = serializers.CharField(source="source_url", read_only=True)
+    errorCode = serializers.CharField(source="error_code", read_only=True)
+    errorMessage = serializers.CharField(source="error_message", read_only=True)
+    fileSizeBytes = serializers.IntegerField(source="file_size_bytes", read_only=True)
+
+    class Meta:
+        model = RecipeImportJob
+        fields = [
+            "id",
+            "status",
+            "platform",
+            "sourceUrl",
+            "mediaUrl",
+            "audioUrl",
+            "result",
+            "transcript",
+            "fileSizeBytes",
+            "errorCode",
+            "errorMessage",
+            "createdAt",
+            "updatedAt",
+            "startedAt",
+            "finishedAt",
+        ]
+
+    def get_mediaUrl(self, obj):
+        if not obj.media_file:
+            return None
+        try:
+            return obj.media_file.url
+        except Exception:
+            return None
+
+    def get_audioUrl(self, obj):
+        if not obj.audio_file:
+            return None
+        try:
+            return obj.audio_file.url
+        except Exception:
+            return None

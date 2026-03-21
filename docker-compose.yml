@@ -9,16 +9,33 @@ services:
     ports:
       - "5432:5432"
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
   backend:
     build: ./backend
     env_file:
       - ${ENV_FILE:-dev_env}
     depends_on:
       - db
+      - redis
     volumes:
       - ./backend/media:/app/media
     ports:
       - "8000:8000"
+
+  worker:
+    build: ./backend
+    command: celery -A cookbook worker -l info
+    env_file:
+      - ${ENV_FILE:-dev_env}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend/media:/app/media
 
   frontend:
     build:
