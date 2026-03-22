@@ -144,7 +144,7 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 CELERY_TASK_TIME_LIMIT=900
 CELERY_TASK_SOFT_TIME_LIMIT=840
 
-RECIPE_IMPORT_JOBS_RATE_LIMIT=10/hour
+RECIPE_IMPORT_JOBS_RATE_LIMIT=1200/hour
 RECIPE_IMPORT_MAX_FILESIZE_BYTES=104857600
 RECIPE_IMPORT_DOWNLOAD_TIMEOUT_SECONDS=180
 RECIPE_IMPORT_ALLOWED_HOSTS=instagram.com,www.instagram.com,m.instagram.com,tiktok.com,www.tiktok.com,m.tiktok.com,vm.tiktok.com,youtube.com,www.youtube.com,m.youtube.com,youtu.be
@@ -242,9 +242,9 @@ run_compose build backend worker frontend
 echo "Starting infrastructure services..."
 run_compose up -d db redis
 if [[ "${ENABLE_OLLAMA}" -eq 1 ]]; then
-  run_compose --profile ollama up -d ollama
+  run_compose up -d ollama
   echo "Pulling Ollama model ${OLLAMA_DEFAULT_MODEL}..."
-  run_compose --profile ollama exec -T ollama ollama pull "${OLLAMA_DEFAULT_MODEL}"
+  run_compose exec -T ollama ollama pull "${OLLAMA_DEFAULT_MODEL}"
 fi
 
 if [[ "${IMPORT_EXISTING_DB}" -eq 1 ]]; then
@@ -276,11 +276,7 @@ else
 fi
 
 echo "Starting application services..."
-if [[ "${ENABLE_OLLAMA}" -eq 1 ]]; then
-  run_compose --profile ollama up -d backend worker frontend
-else
-  run_compose up -d backend worker frontend
-fi
+run_compose up -d backend worker frontend
 
 cat <<EOF
 

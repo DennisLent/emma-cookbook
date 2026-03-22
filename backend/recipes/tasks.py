@@ -21,19 +21,24 @@ from .models import RecipeImportJob
 def process_recipe_import_job(self, job_id: int):
     job = RecipeImportJob.objects.get(pk=job_id)
     job.status = RecipeImportJob.STATUS_RUNNING
+    job.progress_stage = RecipeImportJob.STAGE_DOWNLOADING
     job.started_at = timezone.now()
     job.finished_at = None
     job.error_code = ""
     job.error_message = ""
     job.celery_task_id = self.request.id or ""
-    job.save(update_fields=["status", "started_at", "finished_at", "error_code", "error_message", "celery_task_id", "updated_at"])
+    job.save(update_fields=["status", "progress_stage", "started_at", "finished_at", "error_code", "error_message", "celery_task_id", "updated_at"])
 
     try:
         with TemporaryDirectory(prefix=f"recipe-import-{job.pk}-") as tmpdir:
             video_path, file_size = download_public_video(job.source_url, tmpdir)
+            job.progress_stage = RecipeImportJob.STAGE_PARSING
+            job.save(update_fields=["progress_stage", "updated_at"])
             audio_path = extract_audio_from_video(video_path)
             transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
             extracted_recipe = extract_recipe_from_transcript(transcript=transcript, source_url=job.source_url)
+            job.progress_stage = RecipeImportJob.STAGE_VERIFYING
+            job.save(update_fields=["progress_stage", "updated_at"])
 
             if extracted_recipe is None:
                 raise PublicVideoDownloadError(
@@ -51,6 +56,7 @@ def process_recipe_import_job(self, job_id: int):
                 job.transcript = transcript
                 job.extracted_recipe = extracted_recipe
                 job.status = RecipeImportJob.STATUS_DONE
+                job.progress_stage = RecipeImportJob.STAGE_DONE
                 job.finished_at = timezone.now()
                 job.save()
 

@@ -30,6 +30,7 @@ class RecipeImportJobApiTests(APITestCase):
 
         job = RecipeImportJob.objects.get()
         self.assertEqual(job.status, RecipeImportJob.STATUS_QUEUED)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_QUEUED)
         self.assertEqual(job.platform, "instagram")
         delay_mock.assert_called_once_with(job.pk)
         validate_mock.assert_called_once()
@@ -121,6 +122,7 @@ class RecipeImportJobTaskTests(APITestCase):
 
         job.refresh_from_db()
         self.assertEqual(job.status, RecipeImportJob.STATUS_DONE)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DONE)
         self.assertEqual(job.file_size_bytes, 5)
         self.assertTrue(job.media_file.name)
         self.assertTrue(job.audio_file.name)
@@ -144,6 +146,7 @@ class RecipeImportJobTaskTests(APITestCase):
 
         job.refresh_from_db()
         self.assertEqual(job.status, RecipeImportJob.STATUS_FAILED)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DOWNLOADING)
         self.assertEqual(job.error_code, "authentication_required")
 
 

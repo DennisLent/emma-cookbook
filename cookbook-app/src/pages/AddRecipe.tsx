@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { useRecipes } from "@/hooks/useRecipes";
 import { Ingredient, Step, Recipe } from "@/types/recipe";
 import { toast } from "@/hooks/use-toast";
@@ -29,12 +30,90 @@ type RecipeImportJobResult = {
 type RecipeImportJob = {
   id: number;
   status: "queued" | "running" | "done" | "failed";
+  progressStage: "queued" | "downloading" | "parsing" | "verifying" | "done" | "failed";
   platform: "instagram" | "tiktok" | "youtube";
   sourceUrl: string;
   errorCode?: string;
   errorMessage?: string;
   result?: RecipeImportJobResult;
 };
+
+const IMPORT_PROGRESS_STEPS = [
+  { key: "downloading", label: "Downloading" },
+  { key: "parsing", label: "Parsing" },
+  { key: "verifying", label: "Verifying" },
+  { key: "done", label: "Done" },
+] as const;
+
+type ImportProgressStepKey = (typeof IMPORT_PROGRESS_STEPS)[number]["key"];
+
+function getImportProgressValue(stage: RecipeImportJob["progressStage"]) {
+  switch (stage) {
+    case "queued":
+      return 8;
+    case "downloading":
+      return 30;
+    case "parsing":
+      return 58;
+    case "verifying":
+      return 82;
+    case "done":
+      return 100;
+    case "failed":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function getImportStageDescription(job: RecipeImportJob) {
+  if (job.status === "failed") {
+    return job.errorMessage || "The importer could not process this video.";
+  }
+
+  switch (job.progressStage) {
+    case "queued":
+      return "Your import is queued and waiting for the worker to pick it up.";
+    case "downloading":
+      return "We are fetching the source video and preparing it for transcription.";
+    case "parsing":
+      return "We are extracting audio, transcribing the content, and turning it into recipe data.";
+    case "verifying":
+      return "We are validating the parsed recipe before filling in the form.";
+    case "done":
+      return "Imported fields have been filled in below. Review them before saving.";
+    case "failed":
+      return job.errorMessage || "The importer could not process this video.";
+    default:
+      return "Import in progress.";
+  }
+}
+
+function formatImportStageLabel(job: RecipeImportJob) {
+  const label = job.progressStage.charAt(0).toUpperCase() + job.progressStage.slice(1);
+  return job.status === "failed" ? `${label} failed` : label;
+}
+
+function getImportStepState(step: ImportProgressStepKey, stage: RecipeImportJob["progressStage"]) {
+  const stepOrder: ImportProgressStepKey[] = ["downloading", "parsing", "verifying", "done"];
+  const normalizedStage = stage === "queued" || stage === "failed" ? "downloading" : stage;
+  const currentIndex = stepOrder.indexOf(normalizedStage as ImportProgressStepKey);
+  const stepIndex = stepOrder.indexOf(step);
+
+  if (stage === "queued") {
+    return step === "downloading" ? "current" : "pending";
+  }
+
+  if (stepIndex < currentIndex) {
+    return "complete";
+  }
+
+  if (stepIndex === currentIndex) {
+    return "current";
+  }
+
+  return "pending";
+}
 
 function splitImportedInstructions(raw: string | undefined) {
   if (!raw) return [{ order: 1, text: "" }];
@@ -232,7 +311,7 @@ export default function AddRecipe() {
           variant: "destructive",
         });
       }
-    }, 3000);
+    }, 5000);
 
     return () => window.clearInterval(interval);
   }, [importJob]);
@@ -626,16 +705,43 @@ export default function AddRecipe() {
                 </div>
 
                 {importJob && (
-                  <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
-                    <p className="text-sm font-medium">
-                      Import status: {importJob.status}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {importJob.status === "queued" && "Your video import is queued and waiting for a worker."}
-                      {importJob.status === "running" && "We are downloading the video, extracting audio, and transcribing it."}
-                      {importJob.status === "done" && "Imported fields have been filled in below. Review them before saving."}
-                      {importJob.status === "failed" && (importJob.errorMessage || "The importer could not process this video.")}
-                    </p>
+                  <div className="rounded-lg border bg-muted/40 p-4 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">
+                          Import progress
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {getImportStageDescription(importJob)}
+                        </p>
+                      </div>
+                      <Badge variant={importJob.status === "failed" ? "destructive" : "secondary"}>
+                        {formatImportStageLabel(importJob)}
+                      </Badge>
+                    </div>
+
+                    <Progress value={getImportProgressValue(importJob.progressStage)} className="h-2" />
+
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      {IMPORT_PROGRESS_STEPS.map((step) => {
+                        const stepState = getImportStepState(step.key, importJob.progressStage);
+                        return (
+                          <div
+                            key={step.key}
+                            className="rounded-md border bg-background/80 px-3 py-2"
+                          >
+                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                              {step.label}
+                            </p>
+                            <p className="text-sm font-medium">
+                              {stepState === "complete" && "Complete"}
+                              {stepState === "current" && (importJob.status === "failed" ? "Stopped" : "In progress")}
+                              {stepState === "pending" && "Waiting"}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

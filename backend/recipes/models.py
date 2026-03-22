@@ -132,10 +132,26 @@ class RecipeImportJob(models.Model):
         (PLATFORM_YOUTUBE, "YouTube"),
     )
 
+    STAGE_QUEUED = "queued"
+    STAGE_DOWNLOADING = "downloading"
+    STAGE_PARSING = "parsing"
+    STAGE_VERIFYING = "verifying"
+    STAGE_DONE = "done"
+    STAGE_FAILED = "failed"
+    STAGE_CHOICES = (
+        (STAGE_QUEUED, "Queued"),
+        (STAGE_DOWNLOADING, "Downloading"),
+        (STAGE_PARSING, "Parsing"),
+        (STAGE_VERIFYING, "Verifying"),
+        (STAGE_DONE, "Done"),
+        (STAGE_FAILED, "Failed"),
+    )
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recipe_import_jobs")
     source_url = models.URLField()
     platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_QUEUED)
+    progress_stage = models.CharField(max_length=16, choices=STAGE_CHOICES, default=STAGE_QUEUED)
     media_file = models.FileField(upload_to="recipe_imports/media/", blank=True)
     audio_file = models.FileField(upload_to="recipe_imports/audio/", blank=True)
     transcript = models.TextField(blank=True)

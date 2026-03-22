@@ -105,7 +105,7 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'recipe_import_jobs': config('RECIPE_IMPORT_JOBS_RATE_LIMIT', default='10/hour'),
+        'recipe_import_jobs': config('RECIPE_IMPORT_JOBS_RATE_LIMIT', default='1200/hour'),
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 30,

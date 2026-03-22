@@ -50,8 +50,6 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    profiles:
-      - ollama
     volumes:
       - ollama_data:/root/.ollama
     ports:

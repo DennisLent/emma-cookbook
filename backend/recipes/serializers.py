@@ -432,12 +432,14 @@ class RecipeImportJobSerializer(serializers.ModelSerializer):
     errorCode = serializers.CharField(source="error_code", read_only=True)
     errorMessage = serializers.CharField(source="error_message", read_only=True)
     fileSizeBytes = serializers.IntegerField(source="file_size_bytes", read_only=True)
+    progressStage = serializers.CharField(source="progress_stage", read_only=True)
 
     class Meta:
         model = RecipeImportJob
         fields = [
             "id",
             "status",
+            "progressStage",
             "platform",
             "sourceUrl",
             "mediaUrl",
