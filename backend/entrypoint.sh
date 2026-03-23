@@ -7,10 +7,16 @@ while ! nc -z "$POSTGRES_HOST" "$POSTGRES_PORT"; do
   sleep 1
 done
 
-python manage.py migrate
+if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
+  python manage.py migrate
+fi
 
-if [ "${SEED_INTERNAL_DATA:-0}" = "1" ]; then
+if [ "${RUN_MIGRATIONS:-1}" = "1" ] && [ "${SEED_INTERNAL_DATA:-0}" = "1" ]; then
   python manage.py seed_internal_data --username "$DJANGO_SUPERUSER_USERNAME" --password "$DJANGO_SUPERUSER_PASSWORD"
+fi
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
 fi
 
 exec gunicorn cookbook.wsgi:application --bind 0.0.0.0:8000

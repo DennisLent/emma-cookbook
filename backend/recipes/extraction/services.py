@@ -1,12 +1,61 @@
+from django.conf import settings
+
 from .utils import (
     get_yt_transcript_cleaned,
     extract_recipe_via_ollama,
-    extract_recipe_transcript_with_vosk,
 )
 import re
+from tempfile import TemporaryDirectory
 from recipe_scrapers import scrape_me
 from ingredient_parser import parse_ingredient
 from recipes.models import Ingredient
+from .utils import download_public_video, extract_audio_from_video, normalize_transcript_text, transcribe_wav_with_vosk, validate_public_video_url
+
+
+def _clean_text(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def build_recipe_payload_from_details(*, details: dict, source_url: str) -> dict | None:
+    title = _clean_text(details.get("title"))
+    raw_ings = details.get("ingredients", [])
+    raw_steps = details.get("instructions", [])
+
+    ingredients_data = []
+    for ing in raw_ings:
+        name = _clean_text(ing.get("name"))
+        amount = _clean_text(ing.get("amount"))
+        if not name:
+            continue
+
+        obj, _ = Ingredient.objects.get_or_create(
+            name__iexact=name,
+            defaults={"name": name}
+        )
+
+        ingredients_data.append({
+            "ingredient": obj.name,
+            "amount": amount,
+        })
+
+    if not ingredients_data:
+        return None
+
+    instruction_steps = [_clean_text(step) for step in raw_steps]
+    instructions = "\n".join(step for step in instruction_steps if step)
+    if not instructions:
+        return None
+
+    return {
+        "title": title or "Imported recipe",
+        "description": source_url,
+        "instructions": instructions,
+        "ingredients_data": ingredients_data,
+        "tags": [],
+        "image": None,
+    }
 
 def extract_recipe_from_website(url: str) -> dict:
     try:
@@ -64,98 +113,46 @@ def extract_recipe_from_website(url: str) -> dict:
         "image": None,
     }
 
-def extract_recipe_from_youtube(url: str, model: str = "llama3.2") -> dict | None:
+def extract_recipe_from_youtube(url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
     transcript = get_yt_transcript_cleaned(url)
     if len(transcript.split()) < 50:
         return None
 
-    details    = extract_recipe_via_ollama(transcript=transcript, model=model)
-    title      = details.get("title", "").strip()
-    raw_ings   = details.get("ingredients", [])
-    raw_steps  = details.get("instructions", [])
-
-    ingredients_data = []
-    for ing in raw_ings:
-        name   = ing.get("name", "").strip()
-        amount = ing.get("amount", "").strip()
-        if not name:
-            continue
-
-        # persist or fetch your Ingredient record
-        obj, _ = Ingredient.objects.get_or_create(
-            name__iexact=name,
-            defaults={"name": name}
-        )
-
-        ingredients_data.append({
-            "ingredient": obj.name,
-            "amount":     amount,
-        })
-
-    if not ingredients_data:
-        return None
-
-    instructions = "\n".join(s.strip() for s in raw_steps if s.strip())
-
-    return {
-        "title":            title,
-        "description":      url,
-        "instructions":     instructions,
-        "ingredients_data": ingredients_data,
-        "tags":             [],
-        "image":            None,
-    }
+    details = extract_recipe_via_ollama(transcript=transcript, model=model)
+    return build_recipe_payload_from_details(details=details, source_url=url)
 
 
-def extract_recipe_from_instagram(
-    url: str,
-    model: str = "llama3.2",
-    ig_username: str | None = None,
-    ig_password: str | None = None,
-) -> dict | None:
-    """Extract and structure a recipe from an Instagram Reel."""
-
-    transcript = extract_recipe_transcript_with_vosk(
-        video_url=url,
-        ig_username=ig_username,
-        ig_password=ig_password,
-    )
-
+def extract_recipe_from_transcript(transcript: str, source_url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
     if not transcript or len(transcript.split()) < 50:
         return None
 
     details = extract_recipe_via_ollama(transcript=transcript, model=model)
-    title = details.get("title", "").strip()
-    raw_ings = details.get("ingredients", [])
-    raw_steps = details.get("instructions", [])
+    return build_recipe_payload_from_details(details=details, source_url=source_url)
 
-    ingredients_data = []
-    for ing in raw_ings:
-        name = ing.get("name", "").strip()
-        amount = ing.get("amount", "").strip()
-        if not name:
-            continue
 
-        obj, _ = Ingredient.objects.get_or_create(
-            name__iexact=name,
-            defaults={"name": name},
-        )
+def extract_recipe_from_instagram(url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
+    platform = validate_public_video_url(url)
+    if platform != "instagram":
+        raise ValueError("The provided URL is not a supported Instagram URL.")
 
-        ingredients_data.append({
-            "ingredient": obj.name,
-            "amount": amount,
-        })
+    with TemporaryDirectory(prefix="instagram-import-") as tmpdir:
+        video_path, _ = download_public_video(url, tmpdir)
+        audio_path = extract_audio_from_video(video_path)
+        transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
+        return extract_recipe_from_transcript(transcript=transcript, source_url=url, model=model)
 
-    if not ingredients_data:
-        return None
 
-    instructions = "\n".join(s.strip() for s in raw_steps if s.strip())
+def extract_recipe_from_tiktok(url: str, model: str | None = None) -> dict | None:
+    model = model or settings.OLLAMA_DEFAULT_MODEL
+    platform = validate_public_video_url(url)
+    if platform != "tiktok":
+        raise ValueError("The provided URL is not a supported TikTok URL.")
 
-    return {
-        "title": title,
-        "description": url,
-        "instructions": instructions,
-        "ingredients_data": ingredients_data,
-        "tags": [],
-        "image": None,
-    }
+    with TemporaryDirectory(prefix="tiktok-import-") as tmpdir:
+        video_path, _ = download_public_video(url, tmpdir)
+        audio_path = extract_audio_from_video(video_path)
+        transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
+        return extract_recipe_from_transcript(transcript=transcript, source_url=url, model=model)

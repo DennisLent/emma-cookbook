@@ -7,14 +7,31 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 env_path = BASE_DIR.parent / '.env'
+production_env_path = BASE_DIR.parent / '.env.production'
 dev_env_path = BASE_DIR.parent / 'dev_env'
 
 if env_path.exists():
     config = Config(repository=RepositoryEnv(str(env_path)))
+elif production_env_path.exists():
+    config = Config(repository=RepositoryEnv(str(production_env_path)))
 elif dev_env_path.exists():
     config = Config(repository=RepositoryEnv(str(dev_env_path)))
 else:
     config = Config(repository={})
+
+
+def config_bool(name, default=False):
+    value = config(name, default=default)
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+    if normalized in {'1', 'true', 't', 'yes', 'y', 'on', 'debug', 'development', 'dev'}:
+        return True
+    if normalized in {'0', 'false', 'f', 'no', 'n', 'off', 'release', 'prod', 'production', ''}:
+        return False
+
+    return default
 
 
 # Quick-start development settings - unsuitable for production
@@ -24,7 +41,8 @@ else:
 SECRET_KEY = config('SECRET_KEY', default='dev-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config_bool('DEBUG', default=False)
+USE_S3_MEDIA_STORAGE = config_bool('USE_S3_MEDIA_STORAGE', default=False)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='127.0.0.1,localhost,testserver')
 
@@ -50,6 +68,9 @@ INSTALLED_APPS = [
     "recipes",
     "corsheaders"
 ]
+
+if USE_S3_MEDIA_STORAGE:
+    INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -83,6 +104,12 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'recipe_import_jobs': config('RECIPE_IMPORT_JOBS_RATE_LIMIT', default='1200/hour'),
+    },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 30,
 }
@@ -118,7 +145,11 @@ SIMPLE_JWT = {
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-database_engine = config('DATABASE_ENGINE', default='postgres')
+database_engine = str(config('DATABASE_ENGINE', default='')).strip().lower()
+has_postgres_config = any(
+    str(config(key, default='')).strip()
+    for key in ('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_HOST', 'POSTGRES_PORT')
+)
 
 if database_engine == 'sqlite':
     DATABASES = {
@@ -127,7 +158,7 @@ if database_engine == 'sqlite':
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-elif env_path.exists() or dev_env_path.exists():
+elif database_engine in {'postgres', 'postgresql'} or has_postgres_config:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -184,6 +215,44 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+if USE_S3_MEDIA_STORAGE:
+    AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
+    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='')
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='')
+    AWS_S3_CUSTOM_DOMAIN = config('AWS_S3_CUSTOM_DOMAIN', default='')
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3.S3Storage',
+            'OPTIONS': {
+                'bucket_name': AWS_STORAGE_BUCKET_NAME,
+                'region_name': AWS_S3_REGION_NAME or None,
+                'endpoint_url': AWS_S3_ENDPOINT_URL or None,
+                'custom_domain': AWS_S3_CUSTOM_DOMAIN or None,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+else:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            'OPTIONS': {
+                'location': MEDIA_ROOT,
+                'base_url': MEDIA_URL,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -201,3 +270,23 @@ KEYCLOAK_JWKS_URL = config(
     default=f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
 )
 KEYCLOAK_ADMIN_ROLE = config('KEYCLOAK_ADMIN_ROLE', default='cookbook-admin')
+OLLAMA_DEFAULT_MODEL = config('OLLAMA_DEFAULT_MODEL', default='llama3.2')
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=CELERY_BROKER_URL)
+CELERY_TASK_TIME_LIMIT = config('CELERY_TASK_TIME_LIMIT', cast=int, default=900)
+CELERY_TASK_SOFT_TIME_LIMIT = config('CELERY_TASK_SOFT_TIME_LIMIT', cast=int, default=840)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = config_bool('CELERY_TASK_ALWAYS_EAGER', default=False)
+CELERY_TASK_EAGER_PROPAGATES = config_bool('CELERY_TASK_EAGER_PROPAGATES', default=False)
+
+RECIPE_IMPORT_MAX_FILESIZE_BYTES = config('RECIPE_IMPORT_MAX_FILESIZE_BYTES', cast=int, default=104857600)
+RECIPE_IMPORT_DOWNLOAD_TIMEOUT_SECONDS = config('RECIPE_IMPORT_DOWNLOAD_TIMEOUT_SECONDS', cast=int, default=180)
+RECIPE_IMPORT_ALLOWED_HOSTS = config(
+    'RECIPE_IMPORT_ALLOWED_HOSTS',
+    cast=Csv(),
+    default='instagram.com,www.instagram.com,m.instagram.com,tiktok.com,www.tiktok.com,m.tiktok.com,vm.tiktok.com,youtube.com,www.youtube.com,m.youtube.com,youtu.be',
+)

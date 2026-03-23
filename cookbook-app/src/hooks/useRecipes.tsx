@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/api";
 
 type RecipesContextType = {
   recipes: Recipe[];
+  isLoading: boolean;
   addRecipe: (recipe: Omit<Recipe, "id">) => Promise<Recipe>;
   updateRecipe: (id: string, recipe: Omit<Recipe, "id">) => Promise<Recipe>;
   deleteRecipe: (id: string) => Promise<boolean>;
@@ -15,7 +16,12 @@ type RecipesContextType = {
 
 const RecipesContext = createContext<RecipesContextType | undefined>(undefined);
 
-type RecipesListResponse = { results?: Recipe[] } | Recipe[];
+type RecipesPageResponse = {
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: Recipe[];
+} | Recipe[];
 
 function normalizeRecipe(recipe: Recipe): Recipe {
   return {
@@ -37,17 +43,41 @@ function normalizeRecipe(recipe: Recipe): Recipe {
   };
 }
 
-function normalizeRecipes(payload: RecipesListResponse): Recipe[] {
+function normalizeRecipes(payload: RecipesPageResponse): Recipe[] {
   const recipes = Array.isArray(payload) ? payload : payload.results || [];
   return recipes.map(normalizeRecipe);
 }
 
+function getNextRecipesPath(nextUrl: string | null | undefined): string | null {
+  if (!nextUrl) return null;
+
+  try {
+    const url = new URL(nextUrl, window.location.origin);
+    const apiIndex = url.pathname.indexOf("/api/");
+    const path = apiIndex >= 0 ? url.pathname.slice(apiIndex + 4) : url.pathname;
+    return `${path}${url.search}`;
+  } catch {
+    return null;
+  }
+}
+
 export function RecipesProvider({ children }: { children: ReactNode }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const refreshRecipes = async () => {
-    const payload = await apiRequest<RecipesListResponse>("/recipes/");
-    setRecipes(normalizeRecipes(payload));
+    setIsLoading(true);
+    const allRecipes: Recipe[] = [];
+    let nextPath: string | null = "/recipes/";
+
+    while (nextPath) {
+      const payload = await apiRequest<RecipesPageResponse>(nextPath);
+      allRecipes.push(...normalizeRecipes(payload));
+      nextPath = Array.isArray(payload) ? null : getNextRecipesPath(payload.next);
+    }
+
+    setRecipes(allRecipes);
+    setIsLoading(false);
   };
 
   const refreshRecipe = async (id: string) => {
@@ -60,7 +90,10 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refreshRecipes().catch(() => setRecipes([]));
+    refreshRecipes().catch(() => {
+      setRecipes([]);
+      setIsLoading(false);
+    });
   }, []);
 
   const addRecipe = async (recipe: Omit<Recipe, "id">) => {
@@ -111,7 +144,7 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
 
   return (
     <RecipesContext.Provider
-      value={{ recipes, addRecipe, updateRecipe, deleteRecipe, exportRecipes, importRecipes, refreshRecipes, refreshRecipe }}
+      value={{ recipes, isLoading, addRecipe, updateRecipe, deleteRecipe, exportRecipes, importRecipes, refreshRecipes, refreshRecipe }}
     >
       {children}
     </RecipesContext.Provider>

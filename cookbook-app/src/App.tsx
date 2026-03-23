@@ -16,6 +16,7 @@ import Login from "./pages/Login";
  import Profile from "./pages/Profile";
  import MealPlan from "./pages/MealPlan";
 import IngredientMatch from "./pages/IngredientMatch";
+import RecipePage from "./pages/RecipePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
                  <Route path="/profile" element={<Profile />} />
                  <Route path="/meal-plan" element={<MealPlan />} />
                  <Route path="/match" element={<IngredientMatch />} />
+                <Route path="/recipes/:id" element={<RecipePage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

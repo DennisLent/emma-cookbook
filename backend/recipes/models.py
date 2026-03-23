@@ -110,6 +110,67 @@ class Recipe(models.Model):
     def __str__(self):
         return self.title
 
+
+class RecipeImportJob(models.Model):
+    STATUS_QUEUED = "queued"
+    STATUS_RUNNING = "running"
+    STATUS_DONE = "done"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = (
+        (STATUS_QUEUED, "Queued"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_DONE, "Done"),
+        (STATUS_FAILED, "Failed"),
+    )
+
+    PLATFORM_INSTAGRAM = "instagram"
+    PLATFORM_TIKTOK = "tiktok"
+    PLATFORM_YOUTUBE = "youtube"
+    PLATFORM_CHOICES = (
+        (PLATFORM_INSTAGRAM, "Instagram"),
+        (PLATFORM_TIKTOK, "TikTok"),
+        (PLATFORM_YOUTUBE, "YouTube"),
+    )
+
+    STAGE_QUEUED = "queued"
+    STAGE_DOWNLOADING = "downloading"
+    STAGE_PARSING = "parsing"
+    STAGE_VERIFYING = "verifying"
+    STAGE_DONE = "done"
+    STAGE_FAILED = "failed"
+    STAGE_CHOICES = (
+        (STAGE_QUEUED, "Queued"),
+        (STAGE_DOWNLOADING, "Downloading"),
+        (STAGE_PARSING, "Parsing"),
+        (STAGE_VERIFYING, "Verifying"),
+        (STAGE_DONE, "Done"),
+        (STAGE_FAILED, "Failed"),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recipe_import_jobs")
+    source_url = models.URLField()
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_QUEUED)
+    progress_stage = models.CharField(max_length=16, choices=STAGE_CHOICES, default=STAGE_QUEUED)
+    media_file = models.FileField(upload_to="recipe_imports/media/", blank=True)
+    audio_file = models.FileField(upload_to="recipe_imports/audio/", blank=True)
+    transcript = models.TextField(blank=True)
+    extracted_recipe = models.JSONField(default=dict, blank=True)
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    file_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=64, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.platform} import #{self.pk} ({self.status})"
+
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="recipe_ingredients")
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, related_name="recipe_ingredients")

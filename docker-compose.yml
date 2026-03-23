@@ -1,24 +1,63 @@
-version: '3.9'
 services:
   db:
     image: postgres:15
     env_file:
-      - ${ENV_FILE:-dev_env}
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
-      - ${ENV_FILE:-dev_env}
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
+    environment:
+      RUN_MIGRATIONS: "1"
     depends_on:
       - db
+      - redis
     volumes:
       - ./backend/media:/app/media
+      - ./docker-data/vosk:/app/vosk-model
+      - ./docker-data/bootstrap:/bootstrap
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: celery -A cookbook worker -l info
+    env_file:
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
+    environment:
+      RUN_MIGRATIONS: "0"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend/media:/app/media
+      - ./docker-data/vosk:/app/vosk-model
+      - ./docker-data/bootstrap:/bootstrap
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
 
   frontend:
     build:
@@ -31,3 +70,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

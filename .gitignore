@@ -218,6 +218,9 @@ __marimo__/
 
 # Environment files
 /.env
+/.env.production
+/docker-data/
+/backups/
 
 # Angular CLI and build artefacts
 /.angular-cli.json

@@ -1,97 +1,236 @@
-from django.test import TestCase, override_settings
-from recipes.extraction.utils import (
-    get_yt_transcript_cleaned,
-    extract_recipe_via_ollama,
-    reel_to_wav,
-    extract_recipe_transcript_with_vosk,
-)
-from recipes.extraction.utils.instagram import BadResponseException, InstagramCheckpointRequired
-from recipes.extraction.services import extract_recipe_from_instagram
-from decouple import Config, RepositoryEnv
-from pathlib import Path
-import os
+from unittest.mock import Mock, patch
 
-# VIDEO_NO_AUDIO = "https://youtu.be/ipt85QM__M0?si=RaFtlc1axsgPZw-K"
-VIDEO_AUDIO = "https://youtu.be/SjCkW-oAFQ8?si=F2mhZwwY8g6kuDZt"
-VIDEO_BIG = "https://youtu.be/J2RbSZob6ag?si=vtJrxhE1tWJd-uUj"
+from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.test import override_settings
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 
-VIDEO_URLS = [VIDEO_AUDIO, VIDEO_BIG]
+from recipes.extraction.utils import validate_public_video_url
+from recipes.models import RecipeImportJob
+from recipes.extraction.services import build_recipe_payload_from_details
 
-INSTAGRAM_REEL = "https://www.instagram.com/reel/C4mM4oqsKP-/"
 
-class YouTubeRecipeIntegrationTest(TestCase):
-    """Integration tests for YouTube extraction helpers."""
+class RecipeImportJobApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="chef", password="secret123")
+        self.client.force_authenticate(self.user)
 
-    @override_settings(DEBUG=True)
-    def test_get_yt_transcript_cleaned(self):
-        for video in VIDEO_URLS:
-            transcript = get_yt_transcript_cleaned(video)
-            self.assertTrue(transcript, "Transcript was empty")
-
-    @override_settings(DEBUG=True)
-    def test_extract_recipe_via_ollama(self):
-        if os.system("ollama list | grep -q llama3.2") != 0:
-            self.skipTest("llama3.2 model not installed locally")
-
-        for video in VIDEO_URLS:
-            transcript = get_yt_transcript_cleaned(video)
-            recipe = extract_recipe_via_ollama(transcript, model="llama3.2")
-
-            self.assertIsInstance(recipe, dict)
-            self.assertIn("title", recipe)
-            self.assertIn("ingredients", recipe)
-            self.assertIn("instructions", recipe)
-
-            ings = recipe["ingredients"]
-            self.assertIsInstance(ings, list)
-            self.assertTrue(ings, "Expected at least one ingredient")
-            for ing in ings:
-                self.assertIsInstance(ing, dict)
-                self.assertIn("name", ing)
-                self.assertIn("amount", ing)
-                self.assertIsInstance(ing["name"], str)
-                self.assertIsInstance(ing["amount"], str)
-
-            steps = recipe["instructions"]
-            self.assertIsInstance(steps, list)
-            self.assertTrue(steps, "Expected at least one instruction")
-            for step in steps:
-                self.assertIsInstance(step, str)
-
-class InstagramRecipeIntegrationTest(TestCase):
-    """Integration tests for Instagram Reel extraction."""
-
-    @override_settings(DEBUG=True)
-    def test_extract_recipe_from_instagram(self):
-        env_path = Path(__file__).resolve().parents[2] / ".env"
-        config = Config(repository=RepositoryEnv(str(env_path)))
-        username = config("INSTAGRAM_USERNAME", default=None)
-        password = config("INSTAGRAM_PASSWORD", default=None)
-
-        if not username or not password:
-            self.skipTest("Instagram credentials not configured in .env")
-
-        try:
-            recipe = extract_recipe_from_instagram(
-                INSTAGRAM_REEL,
-                model="llama3.2",
-                ig_username=username,
-                ig_password=password,
+    @patch("recipes.extraction.utils.validate_public_video_url", return_value="instagram")
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_queues_background_task(self, delay_mock, validate_mock):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.instagram.com/reel/abc123/"},
+                format="json",
             )
-        
-        except InstagramCheckpointRequired as e:
-            self.skipTest(f"IG challenge required: {e.challenge_url}")
-        except BadResponseException as e:
-            self.skipTest(f"IG blocked anonymous/metadata fetch: {e}")
-        except RuntimeError as e:
-            if "vosk model" in str(e).lower():
-                self.skipTest("Vosk model not available")
-            raise
 
-        self.assertIsInstance(recipe, dict)
-        self.assertIn("title", recipe)
-        self.assertIn("ingredients_data", recipe)
-        self.assertIn("instructions", recipe)
-        self.assertTrue(recipe["ingredients_data"])
-        self.assertTrue(recipe["instructions"])
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(RecipeImportJob.objects.count(), 1)
 
+        job = RecipeImportJob.objects.get()
+        self.assertEqual(job.status, RecipeImportJob.STATUS_QUEUED)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_QUEUED)
+        self.assertEqual(job.platform, "instagram")
+        delay_mock.assert_called_once_with(job.pk)
+        validate_mock.assert_called_once()
+
+    def test_create_recipe_import_job_rejects_unsupported_host(self):
+        response = self.client.post(
+            reverse("recipe-import-job-list"),
+            {"url": "https://example.com/video/123"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"]["code"], "unsupported_host")
+
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_accepts_youtube_url(self, delay_mock):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.youtube.com/watch?v=HILQ80TNyCk"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        job = RecipeImportJob.objects.get()
+        self.assertEqual(job.platform, RecipeImportJob.PLATFORM_YOUTUBE)
+        delay_mock.assert_called_once_with(job.pk)
+
+    @patch("recipes.extraction.utils.validate_public_video_url", return_value="instagram")
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_waits_until_transaction_commit(self, delay_mock, validate_mock):
+        with transaction.atomic():
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.instagram.com/reel/abc123/"},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            delay_mock.assert_not_called()
+
+        job = RecipeImportJob.objects.get()
+        delay_mock.assert_called_once_with(job.pk)
+        validate_mock.assert_called_once()
+
+    def test_retrieve_recipe_import_job_is_scoped_to_request_user(self):
+        other_user = get_user_model().objects.create_user(username="other", password="secret123")
+        job = RecipeImportJob.objects.create(
+            user=other_user,
+            source_url="https://www.tiktok.com/@cook/video/123",
+            platform=RecipeImportJob.PLATFORM_TIKTOK,
+        )
+
+        response = self.client.get(reverse("recipe-import-job-detail", args=[job.pk]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class RecipeImportJobTaskTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="task-user", password="secret123")
+
+    @patch("recipes.tasks.extract_recipe_from_transcript")
+    @patch("recipes.tasks.transcribe_wav_with_vosk", return_value="mix flour with eggs and bake for twenty minutes " * 5)
+    @patch("recipes.tasks.extract_audio_from_video")
+    @patch("recipes.tasks.download_public_video")
+    def test_process_recipe_import_job_marks_job_done(
+        self,
+        download_mock,
+        extract_audio_mock,
+        transcribe_mock,
+        extract_recipe_mock,
+    ):
+        job = RecipeImportJob.objects.create(
+            user=self.user,
+            source_url="https://www.instagram.com/reel/abc123/",
+            platform=RecipeImportJob.PLATFORM_INSTAGRAM,
+        )
+
+        def fake_download(_url, target_dir):
+            video_path = f"{target_dir}/clip.mp4"
+            with open(video_path, "wb") as handle:
+                handle.write(b"video")
+            return video_path, 5
+
+        def fake_audio(video_path):
+            audio_path = video_path.replace(".mp4", ".wav")
+            with open(audio_path, "wb") as handle:
+                handle.write(b"audio")
+            return audio_path
+
+        download_mock.side_effect = fake_download
+        extract_audio_mock.side_effect = fake_audio
+        extract_recipe_mock.return_value = {
+            "title": "Test Recipe",
+            "description": "https://www.instagram.com/reel/abc123/",
+            "instructions": "Mix\nBake",
+            "ingredients_data": [{"ingredient": "Flour", "amount": "1 cup"}],
+            "tags": [],
+            "image": None,
+        }
+
+        from recipes.tasks import process_recipe_import_job
+
+        process_recipe_import_job.run(job.pk)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, RecipeImportJob.STATUS_DONE)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DONE)
+        self.assertEqual(job.file_size_bytes, 5)
+        self.assertTrue(job.media_file.name)
+        self.assertTrue(job.audio_file.name)
+        self.assertEqual(job.extracted_recipe["title"], "Test Recipe")
+        transcribe_mock.assert_called_once()
+
+    @patch("recipes.tasks.download_public_video")
+    def test_process_recipe_import_job_marks_job_failed(self, download_mock):
+        job = RecipeImportJob.objects.create(
+            user=self.user,
+            source_url="https://www.tiktok.com/@cook/video/123",
+            platform=RecipeImportJob.PLATFORM_TIKTOK,
+        )
+        from recipes.extraction.utils import PublicVideoDownloadError
+        from recipes.tasks import process_recipe_import_job
+
+        download_mock.side_effect = PublicVideoDownloadError("authentication_required", "Private video")
+
+        with self.assertRaises(PublicVideoDownloadError):
+            process_recipe_import_job.run(job.pk)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, RecipeImportJob.STATUS_FAILED)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DOWNLOADING)
+        self.assertEqual(job.error_code, "authentication_required")
+
+    def test_process_recipe_import_job_retries_when_job_is_not_visible_yet(self):
+        from celery.exceptions import Retry
+        from recipes.tasks import process_recipe_import_job
+
+        task = process_recipe_import_job
+        request = Mock(id="celery-task-id")
+        retry = Mock(side_effect=Retry())
+        task.request = request
+        task.retry = retry
+
+        with self.assertRaises(Retry):
+            task.run(999999)
+
+        retry.assert_called_once()
+        _, kwargs = retry.call_args
+        self.assertEqual(kwargs["countdown"], 1)
+        self.assertIsInstance(kwargs["exc"], RecipeImportJob.DoesNotExist)
+
+
+class PublicVideoValidationTests(APITestCase):
+    @override_settings(
+        RECIPE_IMPORT_ALLOWED_HOSTS=[
+            "instagram.com",
+            "www.instagram.com",
+            "m.instagram.com",
+            "tiktok.com",
+            "www.tiktok.com",
+            "m.tiktok.com",
+            "vm.tiktok.com",
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "youtu.be",
+        ]
+    )
+    def test_validate_public_video_url_accepts_youtube_hosts(self):
+        self.assertEqual(
+            validate_public_video_url("https://www.youtube.com/watch?v=HILQ80TNyCk"),
+            "youtube",
+        )
+        self.assertEqual(
+            validate_public_video_url("https://youtu.be/HILQ80TNyCk"),
+            "youtube",
+        )
+
+
+class RecipeExtractionServiceTests(APITestCase):
+    def test_build_recipe_payload_from_details_handles_null_llm_fields(self):
+        payload = build_recipe_payload_from_details(
+            details={
+                "title": None,
+                "ingredients": [
+                    {"name": "Flour", "amount": None},
+                    {"name": None, "amount": "1 tsp"},
+                ],
+                "instructions": [None, "Mix everything together", ""],
+            },
+            source_url="https://www.instagram.com/reel/example/",
+        )
+
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["title"], "Imported recipe")
+        self.assertEqual(
+            payload["ingredients_data"],
+            [{"ingredient": "Flour", "amount": ""}],
+        )
+        self.assertEqual(payload["instructions"], "Mix everything together")

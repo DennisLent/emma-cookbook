@@ -28,6 +28,39 @@ jobs:
       - name: Run backend tests
         run: python manage.py test users.tests.test_tag_inference recipes.tests_contract
 
+  live-import-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_ENGINE: sqlite
+      SECRET_KEY: ci-secret-key
+      DEBUG: "False"
+      RUN_LIVE_IMPORT_SMOKE_TESTS: "1"
+      CELERY_TASK_ALWAYS_EAGER: "True"
+      CELERY_TASK_EAGER_PROPAGATES: "False"
+      VOSK_MODEL_PATH: /tmp/vosk-model-small-en-us-0.15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install OS packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg unzip
+      - name: Install backend dependencies
+        run: pip install -r ../requirements.txt
+      - name: Download Vosk model
+        run: |
+          curl -L -o /tmp/vosk-model-small-en-us-0.15.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          unzip -q /tmp/vosk-model-small-en-us-0.15.zip -d /tmp
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+      - name: Run live import smoke tests
+        run: python manage.py test recipes.tests_live_imports --verbosity 2
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
