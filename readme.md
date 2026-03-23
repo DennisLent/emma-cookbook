@@ -49,3 +49,11 @@ Run the interactive Docker bootstrap with:
 ```
 
 It creates a production env file, prepares the Vosk model, optionally imports an existing backup, optionally starts Ollama and pulls a model, bootstraps the Django admin user, and then starts the Docker stack.
+
+## Docker rebuild
+
+When changes are made to the project or to the env file, rebuild the entire stack using:
+
+```
+ENV_FILE=.env.production docker compose up --build -d
+```

@@ -21,16 +21,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RecipeCard } from "@/components/RecipeCard";
-import { RecipeDetail } from "@/components/RecipeDetail";
-import { CookMode } from "@/components/CookMode";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useSettings } from "@/hooks/useSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { useSocial } from "@/hooks/useSocial";
 import { useCollections } from "@/hooks/useCollections";
 import { Recipe } from "@/types/recipe";
-
-type ViewMode = "browse" | "detail" | "cook";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -42,8 +38,6 @@ const Index = () => {
   const { collections, createCollection, deleteCollection } = useCollections();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<ViewMode>("browse");
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [minRating, setMinRating] = useState<number>(0);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
@@ -51,18 +45,13 @@ const Index = () => {
   const [newCollectionName, setNewCollectionName] = useState("");
   const tagScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-open recipe from navigation state
   useEffect(() => {
     const recipeId = location.state?.recipeId;
     if (recipeId) {
-      const recipe = recipes.find((r) => r.id === recipeId);
-      if (recipe) {
-        setSelectedRecipe(recipe);
-        setViewMode("detail");
-      }
+      navigate(`/recipes/${recipeId}`, { replace: true });
       window.history.replaceState({}, "");
     }
-  }, [location.state, recipes]);
+  }, [location.state, navigate]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -105,16 +94,8 @@ const Index = () => {
   };
 
   const handleRecipeClick = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
-    setViewMode("detail");
+    navigate(`/recipes/${recipe.id}`);
   };
-
-  const handleCloseBrowse = () => {
-    setViewMode("browse");
-    setSelectedRecipe(null);
-  };
-
-  const handleStartCookMode = () => setViewMode("cook");
 
   const handleLogout = () => {
     logout();
@@ -140,20 +121,6 @@ const Index = () => {
     }
   };
 
-  if (viewMode === "cook" && selectedRecipe) {
-    return <CookMode recipe={selectedRecipe} onClose={handleCloseBrowse} />;
-  }
-
-  if (viewMode === "detail" && selectedRecipe) {
-    return (
-      <RecipeDetail
-        recipe={selectedRecipe}
-        onClose={handleCloseBrowse}
-        onStartCookMode={handleStartCookMode}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -178,20 +145,24 @@ const Index = () => {
               <Button variant="outline" size="icon" onClick={() => navigate("/meal-plan")} className="sm:hidden h-9 w-9">
                 <Calendar className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="hidden sm:inline-flex">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => navigate("/settings")} className="sm:hidden h-9 w-9">
-                <SettingsIcon className="w-4 h-4" />
-              </Button>
-              <Button size="sm" onClick={() => navigate("/add")} className="hidden sm:inline-flex">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Recipe
-              </Button>
-              <Button size="icon" onClick={() => navigate("/add")} className="sm:hidden h-9 w-9">
-                <Plus className="w-4 h-4" />
-              </Button>
+              {isAuthenticated && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="hidden sm:inline-flex">
+                    <SettingsIcon className="w-4 h-4 mr-2" />
+                    Settings
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => navigate("/settings")} className="sm:hidden h-9 w-9">
+                    <SettingsIcon className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" onClick={() => navigate("/add")} className="hidden sm:inline-flex">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Recipe
+                  </Button>
+                  <Button size="icon" onClick={() => navigate("/add")} className="sm:hidden h-9 w-9">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
 
               {isAuthenticated ? (
                 <DropdownMenu>

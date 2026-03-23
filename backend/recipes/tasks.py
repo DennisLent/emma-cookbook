@@ -17,9 +17,13 @@ from .extraction.utils import (
 from .models import RecipeImportJob
 
 
-@shared_task(bind=True, autoretry_for=(), retry_backoff=False)
+@shared_task(bind=True, autoretry_for=(), retry_backoff=False, max_retries=5)
 def process_recipe_import_job(self, job_id: int):
-    job = RecipeImportJob.objects.get(pk=job_id)
+    try:
+        job = RecipeImportJob.objects.get(pk=job_id)
+    except RecipeImportJob.DoesNotExist as exc:
+        raise self.retry(exc=exc, countdown=1)
+
     job.status = RecipeImportJob.STATUS_RUNNING
     job.progress_stage = RecipeImportJob.STAGE_DOWNLOADING
     job.started_at = timezone.now()

@@ -7,10 +7,13 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 env_path = BASE_DIR.parent / '.env'
+production_env_path = BASE_DIR.parent / '.env.production'
 dev_env_path = BASE_DIR.parent / 'dev_env'
 
 if env_path.exists():
     config = Config(repository=RepositoryEnv(str(env_path)))
+elif production_env_path.exists():
+    config = Config(repository=RepositoryEnv(str(production_env_path)))
 elif dev_env_path.exists():
     config = Config(repository=RepositoryEnv(str(dev_env_path)))
 else:
@@ -142,7 +145,11 @@ SIMPLE_JWT = {
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-database_engine = config('DATABASE_ENGINE', default='postgres')
+database_engine = str(config('DATABASE_ENGINE', default='')).strip().lower()
+has_postgres_config = any(
+    str(config(key, default='')).strip()
+    for key in ('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_HOST', 'POSTGRES_PORT')
+)
 
 if database_engine == 'sqlite':
     DATABASES = {
@@ -151,7 +158,7 @@ if database_engine == 'sqlite':
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-elif env_path.exists() or dev_env_path.exists():
+elif database_engine in {'postgres', 'postgresql'} or has_postgres_config:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',

@@ -1,6 +1,7 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
@@ -8,6 +9,7 @@ from rest_framework.test import APITestCase
 
 from recipes.extraction.utils import validate_public_video_url
 from recipes.models import RecipeImportJob
+from recipes.extraction.services import build_recipe_payload_from_details
 
 
 class RecipeImportJobApiTests(APITestCase):
@@ -58,6 +60,22 @@ class RecipeImportJobApiTests(APITestCase):
         job = RecipeImportJob.objects.get()
         self.assertEqual(job.platform, RecipeImportJob.PLATFORM_YOUTUBE)
         delay_mock.assert_called_once_with(job.pk)
+
+    @patch("recipes.extraction.utils.validate_public_video_url", return_value="instagram")
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_waits_until_transaction_commit(self, delay_mock, validate_mock):
+        with transaction.atomic():
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.instagram.com/reel/abc123/"},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+            delay_mock.assert_not_called()
+
+        job = RecipeImportJob.objects.get()
+        delay_mock.assert_called_once_with(job.pk)
+        validate_mock.assert_called_once()
 
     def test_retrieve_recipe_import_job_is_scoped_to_request_user(self):
         other_user = get_user_model().objects.create_user(username="other", password="secret123")
@@ -149,6 +167,24 @@ class RecipeImportJobTaskTests(APITestCase):
         self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DOWNLOADING)
         self.assertEqual(job.error_code, "authentication_required")
 
+    def test_process_recipe_import_job_retries_when_job_is_not_visible_yet(self):
+        from celery.exceptions import Retry
+        from recipes.tasks import process_recipe_import_job
+
+        task = process_recipe_import_job
+        request = Mock(id="celery-task-id")
+        retry = Mock(side_effect=Retry())
+        task.request = request
+        task.retry = retry
+
+        with self.assertRaises(Retry):
+            task.run(999999)
+
+        retry.assert_called_once()
+        _, kwargs = retry.call_args
+        self.assertEqual(kwargs["countdown"], 1)
+        self.assertIsInstance(kwargs["exc"], RecipeImportJob.DoesNotExist)
+
 
 class PublicVideoValidationTests(APITestCase):
     @override_settings(
@@ -175,3 +211,26 @@ class PublicVideoValidationTests(APITestCase):
             validate_public_video_url("https://youtu.be/HILQ80TNyCk"),
             "youtube",
         )
+
+
+class RecipeExtractionServiceTests(APITestCase):
+    def test_build_recipe_payload_from_details_handles_null_llm_fields(self):
+        payload = build_recipe_payload_from_details(
+            details={
+                "title": None,
+                "ingredients": [
+                    {"name": "Flour", "amount": None},
+                    {"name": None, "amount": "1 tsp"},
+                ],
+                "instructions": [None, "Mix everything together", ""],
+            },
+            source_url="https://www.instagram.com/reel/example/",
+        )
+
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["title"], "Imported recipe")
+        self.assertEqual(
+            payload["ingredients_data"],
+            [{"ingredient": "Flour", "amount": ""}],
+        )
+        self.assertEqual(payload["instructions"], "Mix everything together")

@@ -12,15 +12,21 @@ from recipes.models import Ingredient
 from .utils import download_public_video, extract_audio_from_video, normalize_transcript_text, transcribe_wav_with_vosk, validate_public_video_url
 
 
+def _clean_text(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def build_recipe_payload_from_details(*, details: dict, source_url: str) -> dict | None:
-    title = details.get("title", "").strip()
+    title = _clean_text(details.get("title"))
     raw_ings = details.get("ingredients", [])
     raw_steps = details.get("instructions", [])
 
     ingredients_data = []
     for ing in raw_ings:
-        name = ing.get("name", "").strip()
-        amount = ing.get("amount", "").strip()
+        name = _clean_text(ing.get("name"))
+        amount = _clean_text(ing.get("amount"))
         if not name:
             continue
 
@@ -37,10 +43,13 @@ def build_recipe_payload_from_details(*, details: dict, source_url: str) -> dict
     if not ingredients_data:
         return None
 
-    instructions = "\n".join(step.strip() for step in raw_steps if step.strip())
+    instruction_steps = [_clean_text(step) for step in raw_steps]
+    instructions = "\n".join(step for step in instruction_steps if step)
+    if not instructions:
+        return None
 
     return {
-        "title": title,
+        "title": title or "Imported recipe",
         "description": source_url,
         "instructions": instructions,
         "ingredients_data": ingredients_data,

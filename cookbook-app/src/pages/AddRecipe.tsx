@@ -371,7 +371,7 @@ export default function AddRecipe() {
     videoEmbed?.type === "instagram" || videoEmbed?.type === "tiktok" || videoEmbed?.type === "youtube"
   );
 
-  const RecipeForm = ({ idPrefix = "" }: { idPrefix?: string }) => (
+  const renderRecipeForm = (idPrefix = "") => (
     <div className="space-y-6">
       {/* Title */}
       <div className="space-y-2">
@@ -660,7 +660,7 @@ export default function AddRecipe() {
 
           {/* Manual Entry Tab */}
           <TabsContent value="manual">
-            <RecipeForm idPrefix="manual-" />
+            {renderRecipeForm("manual-")}
           </TabsContent>
 
           {/* From Link Tab */}
@@ -803,7 +803,7 @@ export default function AddRecipe() {
             </Card>
 
             {/* Recipe Form */}
-            <RecipeForm idPrefix="link-" />
+            {renderRecipeForm("link-")}
           </TabsContent>
         </Tabs>
       </main>

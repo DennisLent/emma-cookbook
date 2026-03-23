@@ -256,7 +256,7 @@ const IngredientMatch = () => {
                 <Card
                   key={recipe.id}
                   className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate("/", { state: { recipeId: recipe.id } })}
+                  onClick={() => navigate(`/recipes/${recipe.id}`)}
                 >
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start gap-3">

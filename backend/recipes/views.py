@@ -425,17 +425,18 @@ class RecipeImportJobViewSet(viewsets.GenericViewSet):
                 details={"field": "url"},
             )
 
-        job = RecipeImportJob.objects.create(
-            user=request.user,
-            source_url=source_url,
-            platform=platform,
-            status=RecipeImportJob.STATUS_QUEUED,
-        )
+        with transaction.atomic():
+            job = RecipeImportJob.objects.create(
+                user=request.user,
+                source_url=source_url,
+                platform=platform,
+                status=RecipeImportJob.STATUS_QUEUED,
+            )
 
-        def enqueue():
-            process_recipe_import_job.delay(job.pk)
+            def enqueue():
+                process_recipe_import_job.delay(job.pk)
 
-        on_commit(enqueue)
+            on_commit(enqueue)
 
         return Response(
             RecipeImportJobSerializer(job, context={"request": request}).data,

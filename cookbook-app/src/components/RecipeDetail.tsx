@@ -88,7 +88,7 @@ export const RecipeDetail = ({ recipe, onClose, onStartCookMode }: RecipeDetailP
    };
  
   const handleShare = async () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/recipes/${recipe.id}`;
     const text = `${recipe.title}\n\n${recipe.description || ""}`;
 
     if (navigator.share) {

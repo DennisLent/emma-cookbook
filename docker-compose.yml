@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:15
     env_file:
-      - ${ENV_FILE:-dev_env}
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -18,7 +18,9 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     env_file:
-      - ${ENV_FILE:-dev_env}
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
+    environment:
+      RUN_MIGRATIONS: "1"
     depends_on:
       - db
       - redis
@@ -37,7 +39,9 @@ services:
       dockerfile: backend/Dockerfile
     command: celery -A cookbook worker -l info
     env_file:
-      - ${ENV_FILE:-dev_env}
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
+    environment:
+      RUN_MIGRATIONS: "0"
     depends_on:
       - db
       - redis
