@@ -17,7 +17,7 @@ import SearchableRecipeSelect from "@/components/SearchableRecipeSelect";
 export default function EditRecipe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { recipes, updateRecipe } = useRecipes();
+  const { recipes, updateRecipe, refreshRecipe, ensureAllRecipesLoaded } = useRecipes();
 
   const recipe = recipes.find((r) => r.id === id);
 
@@ -40,6 +40,16 @@ export default function EditRecipe() {
 
   const sideRecipes = recipes.filter((r) => r.isSide && r.id !== id);
   const sauceRecipes = recipes.filter((r) => r.isSauce && r.id !== id);
+
+  useEffect(() => {
+    ensureAllRecipesLoaded().catch(() => undefined);
+  }, [ensureAllRecipesLoaded]);
+
+  useEffect(() => {
+    if (id && !recipe) {
+      refreshRecipe(id).catch(() => undefined);
+    }
+  }, [id, recipe, refreshRecipe]);
 
   useEffect(() => {
     if (recipe) {

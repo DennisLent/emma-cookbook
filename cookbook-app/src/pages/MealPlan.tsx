@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, RefreshCw, Calendar, UtensilsCrossed, ShoppingCart, Save, FolderOpen, Salad, Droplets, ChevronDown } from "lucide-react";
 import ShoppingListView from "@/components/ShoppingList";
@@ -79,7 +79,7 @@ function normalizeRecipe(recipe: Recipe | null): Recipe | null {
 
 const MealPlan = () => {
   const navigate = useNavigate();
-  const { recipes } = useRecipes();
+  const { recipes, ensureAllRecipesLoaded } = useRecipes();
   const { savedPlans, savePlan, deletePlan } = useSavedMealPlans();
   const { toast } = useToast();
 
@@ -91,6 +91,10 @@ const MealPlan = () => {
   const [mealPlan, setMealPlan] = useState<MealPlanEntry[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("config");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    ensureAllRecipesLoaded().catch(() => undefined);
+  }, [ensureAllRecipesLoaded]);
 
   // Save dialog state
   const [showSaveDialog, setShowSaveDialog] = useState(false);

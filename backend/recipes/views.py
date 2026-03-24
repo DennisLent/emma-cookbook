@@ -3,7 +3,7 @@ from rest_framework import viewsets, permissions, status
 from .models import Recipe, RecipeImportJob, Tag, Rating, Comment, Ingredient
 from .serializers import CollectionSerializer, RecipeImportJobCreateSerializer, RecipeImportJobSerializer, RecipeSerializer, TagSerializer, RatingSerializer, CommentSerializer, IngredientSerializer
 import random
-from django.db.models import Avg, Case, FloatField, IntegerField, Value, When
+from django.db.models import Avg, Case, FloatField, IntegerField, Q, Value, When
 from django.db.models.functions import Coalesce
 from django.db import transaction
 from django.db.transaction import on_commit
@@ -15,6 +15,12 @@ from .models import Collection
 from cookbook.api_errors import error_response
 
 import traceback
+
+
+def query_param_is_truthy(value):
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 # Custom permission
 class IsAuthorOrReadOnly(permissions.BasePermission):
@@ -63,17 +69,59 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset()
 
+        search = (request.query_params.get('search') or '').strip()
+        tags = [tag.strip() for tag in (request.query_params.get('tags') or '').split(',') if tag.strip()]
+        collection_id = (request.query_params.get('collection_id') or '').strip()
+        favorites_only = query_param_is_truthy(request.query_params.get('favorites_only'))
+        min_rating_raw = (request.query_params.get('min_rating') or '').strip()
         sort = request.query_params.get('sort')
         direction = request.query_params.get('direction', 'desc')
         dir_prefix = '-' if direction == 'desc' else ''
+        needs_rating_annotation = sort == 'rating' or bool(min_rating_raw)
+
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(tags__name__icontains=search)
+                | Q(recipe_ingredients__display_name__icontains=search)
+                | Q(recipe_ingredients__ingredient__name__icontains=search)
+            )
+
+        if tags:
+            for tag_name in tags:
+                qs = qs.filter(tags__name__iexact=tag_name)
+
+        if collection_id:
+            qs = qs.filter(collection_recipes__collection_id=collection_id)
+            if request.user and request.user.is_authenticated:
+                qs = qs.filter(collection_recipes__collection__owner=request.user)
+
+        favorite_ids = []
+        if request.user and request.user.is_authenticated:
+            favorite_ids = request.user.favorite_recipe_ids or []
+            if favorites_only:
+                qs = qs.filter(pk__in=favorite_ids)
+        elif favorites_only:
+            qs = qs.none()
+
+        if needs_rating_annotation:
+            qs = qs.annotate(
+                avg_rating_order=Coalesce(Avg('ratings__stars'), Value(0.0), output_field=FloatField())
+            )
+
+        if min_rating_raw:
+            try:
+                min_rating = float(min_rating_raw)
+            except ValueError:
+                min_rating = None
+            if min_rating is not None:
+                qs = qs.filter(avg_rating_order__gte=min_rating)
 
         if request.user and request.user.is_authenticated and sort in ('rating', 'favorites'):
             if sort == 'rating':
-                qs = Recipe.objects.annotate(
-                    avg_rating_order=Coalesce(Avg('ratings__stars'), Value(0.0), output_field=FloatField())
-                ).order_by(f"{dir_prefix}avg_rating_order", '-created_at')
+                qs = qs.order_by(f"{dir_prefix}avg_rating_order", '-created_at')
             elif sort == 'favorites':
-                favorite_ids = request.user.favorite_recipe_ids or []
                 whens = [When(pk=recipe_id, then=Value(1)) for recipe_id in favorite_ids]
                 qs = qs.annotate(
                     favorite_rank=Case(
@@ -82,6 +130,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
                         output_field=IntegerField(),
                     )
                 ).order_by(f"{dir_prefix}favorite_rank", '-created_at')
+        elif sort == 'rating':
+            qs = qs.order_by(f"{dir_prefix}avg_rating_order", '-created_at')
+
+        qs = qs.distinct()
 
         page = self.paginate_queryset(qs)
         if page is not None:

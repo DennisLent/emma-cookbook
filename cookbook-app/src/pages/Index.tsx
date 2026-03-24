@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Search, ChefHat, Plus, Settings as SettingsIcon, LogIn, User, Heart, Star, Calendar, UtensilsCrossed, FolderPlus, ChevronLeft, ChevronRight, X, Bookmark } from "lucide-react";
+import { Search, ChefHat, Plus, Settings as SettingsIcon, LogIn, User, Heart, Star, Calendar, UtensilsCrossed, FolderPlus, ChevronLeft, ChevronRight, X, Bookmark, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,21 +21,97 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { RecipeCard } from "@/components/RecipeCard";
-import { useRecipes } from "@/hooks/useRecipes";
 import { useSettings } from "@/hooks/useSettings";
 import { useAuth } from "@/hooks/useAuth";
-import { useSocial } from "@/hooks/useSocial";
 import { useCollections } from "@/hooks/useCollections";
 import { Recipe } from "@/types/recipe";
+import { apiRequest } from "@/lib/api";
+
+type RecipesPageResponse = {
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: Recipe[];
+} | Recipe[];
+
+type TagOption = {
+  id: string | number;
+  name: string;
+};
+
+type TagsPageResponse = {
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  results?: TagOption[];
+} | TagOption[];
+
+function normalizeRecipe(recipe: Recipe): Recipe {
+  return {
+    ...recipe,
+    id: String(recipe.id),
+    suggestedSideIds: (recipe.suggestedSideIds || []).map((id) => String(id)),
+    suggestedSauceIds: (recipe.suggestedSauceIds || []).map((id) => String(id)),
+    ratings: (recipe.ratings || []).map((rating) => ({
+      ...rating,
+      recipeId: String(rating.recipeId),
+      userId: String(rating.userId),
+    })),
+    comments: (recipe.comments || []).map((comment) => ({
+      ...comment,
+      id: String(comment.id),
+      recipeId: String(comment.recipeId),
+      userId: String(comment.userId),
+    })),
+  };
+}
+
+function normalizeRecipesResponse(payload: RecipesPageResponse) {
+  if (Array.isArray(payload)) {
+    return {
+      recipes: payload.map(normalizeRecipe),
+      count: payload.length,
+      next: null as string | null,
+    };
+  }
+
+  return {
+    recipes: (payload.results || []).map(normalizeRecipe),
+    count: payload.count || 0,
+    next: payload.next || null,
+  };
+}
+
+function normalizeTagsResponse(payload: TagsPageResponse) {
+  const tags = Array.isArray(payload) ? payload : payload.results || [];
+  return tags.map((tag) => tag.name).sort();
+}
+
+function getApiPath(nextUrl: string | null | undefined) {
+  if (!nextUrl) return null;
+
+  try {
+    const url = new URL(nextUrl, window.location.origin);
+    const apiIndex = url.pathname.indexOf("/api/");
+    const path = apiIndex >= 0 ? url.pathname.slice(apiIndex + 4) : url.pathname;
+    return `${path}${url.search}`;
+  } catch {
+    return null;
+  }
+}
 
 const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { recipes } = useRecipes();
   const { settings } = useSettings();
   const { user, isAuthenticated, logout } = useAuth();
-  const { isFavorite, getAverageRating } = useSocial();
   const { collections, createCollection, deleteCollection } = useCollections();
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [nextPath, setNextPath] = useState<string | null>(null);
+  const [totalRecipes, setTotalRecipes] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
@@ -44,6 +120,8 @@ const Index = () => {
   const [showNewCollectionDialog, setShowNewCollectionDialog] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const tagScrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const requestVersionRef = useRef(0);
 
   useEffect(() => {
     const recipeId = location.state?.recipeId;
@@ -53,38 +131,93 @@ const Index = () => {
     }
   }, [location.state, navigate]);
 
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    recipes.forEach((recipe) => recipe.tags.forEach((tag) => tags.add(tag)));
-    return Array.from(tags).sort();
-  }, [recipes]);
+  useEffect(() => {
+    apiRequest<TagsPageResponse>("/tags/")
+      .then((payload) => setAvailableTags(normalizeTagsResponse(payload)))
+      .catch(() => setAvailableTags([]));
+  }, []);
 
-  const filteredRecipes = useMemo(() => {
-    return recipes.filter((recipe) => {
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch =
-        searchQuery === "" ||
-        recipe.title.toLowerCase().includes(searchLower) ||
-        recipe.description?.toLowerCase().includes(searchLower) ||
-        recipe.tags.some((tag) => tag.toLowerCase().includes(searchLower)) ||
-        recipe.ingredients.some((ing) => ing.item.toLowerCase().includes(searchLower));
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) {
+      params.set("search", searchQuery.trim());
+    }
+    if (selectedTags.size > 0) {
+      params.set("tags", Array.from(selectedTags).join(","));
+    }
+    if (showFavoritesOnly) {
+      params.set("favorites_only", "true");
+    }
+    if (minRating > 0) {
+      params.set("min_rating", String(minRating));
+      params.set("sort", "rating");
+      params.set("direction", "desc");
+    }
+    if (selectedCollectionId) {
+      params.set("collection_id", selectedCollectionId);
+    }
 
-      const matchesTags =
-        selectedTags.size === 0 ||
-        recipe.tags.some((tag) => selectedTags.has(tag));
+    const path = `/recipes/${params.toString() ? `?${params.toString()}` : ""}`;
+    let cancelled = false;
+    const requestVersion = requestVersionRef.current + 1;
+    requestVersionRef.current = requestVersion;
+    setIsLoading(true);
 
-      const matchesFavorites = !showFavoritesOnly || isFavorite(recipe.id);
+    apiRequest<RecipesPageResponse>(path)
+      .then((payload) => {
+        if (cancelled || requestVersionRef.current !== requestVersion) return;
+        const normalized = normalizeRecipesResponse(payload);
+        setRecipes(normalized.recipes);
+        setTotalRecipes(normalized.count);
+        setNextPath(getApiPath(normalized.next));
+      })
+      .catch(() => {
+        if (cancelled || requestVersionRef.current !== requestVersion) return;
+        setRecipes([]);
+        setTotalRecipes(0);
+        setNextPath(null);
+      })
+      .finally(() => {
+        if (!cancelled && requestVersionRef.current === requestVersion) {
+          setIsLoading(false);
+        }
+      });
 
-      const { average } = getAverageRating(recipe.id);
-      const matchesRating = minRating === 0 || average >= minRating;
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, selectedTags, showFavoritesOnly, minRating, selectedCollectionId]);
 
-      const matchesCollection =
-        !selectedCollectionId ||
-        collections.find((c) => c.id === selectedCollectionId)?.recipeIds.includes(recipe.id);
+  useEffect(() => {
+    if (!nextPath || !loadMoreRef.current) return;
 
-      return matchesSearch && matchesTags && matchesFavorites && matchesRating && matchesCollection;
-    });
-  }, [recipes, searchQuery, selectedTags, showFavoritesOnly, minRating, selectedCollectionId, isFavorite, getAverageRating, collections]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !isLoadingMore) {
+          const requestVersion = requestVersionRef.current;
+          setIsLoadingMore(true);
+          apiRequest<RecipesPageResponse>(nextPath)
+            .then((payload) => {
+              if (requestVersionRef.current !== requestVersion) return;
+              const normalized = normalizeRecipesResponse(payload);
+              setRecipes((prev) => [...prev, ...normalized.recipes]);
+              setTotalRecipes(normalized.count);
+              setNextPath(getApiPath(normalized.next));
+            })
+            .catch(() => undefined)
+            .finally(() => {
+              if (requestVersionRef.current === requestVersion) {
+                setIsLoadingMore(false);
+              }
+            });
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [isLoadingMore, nextPath]);
 
   const toggleTag = (tag: string) => {
     const newTags = new Set(selectedTags);
@@ -299,7 +432,7 @@ const Index = () => {
         </div>
 
         {/* Tag Filters — Scrollable Row */}
-        {allTags.length > 0 && (
+        {availableTags.length > 0 && (
           <div className="mb-6 space-y-2">
             <h2 className="text-sm font-medium text-muted-foreground">Filter by tags</h2>
             <div className="relative group">
@@ -316,7 +449,7 @@ const Index = () => {
                 className="flex gap-2 overflow-x-auto scrollbar-hide px-1 py-1"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
-                {allTags.map((tag) => (
+                {availableTags.map((tag) => (
                   <Badge
                     key={tag}
                     variant={selectedTags.has(tag) ? "default" : "outline"}
@@ -349,20 +482,33 @@ const Index = () => {
 
         {/* Results Count */}
         <div className="mb-4 text-sm text-muted-foreground">
-          {filteredRecipes.length} {filteredRecipes.length === 1 ? "recipe" : "recipes"}
-          {(searchQuery || selectedTags.size > 0 || selectedCollectionId) && " found"}
+          {totalRecipes} {totalRecipes === 1 ? "recipe" : "recipes"}
+          {(searchQuery || selectedTags.size > 0 || selectedCollectionId || showFavoritesOnly || minRating > 0) && " found"}
+          {totalRecipes > recipes.length ? `, showing ${recipes.length}` : ""}
         </div>
 
         {/* Recipe Grid */}
-        {filteredRecipes.length > 0 ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredRecipes.map((recipe) => (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                onClick={() => handleRecipeClick(recipe)}
-              />
-            ))}
+        {recipes.length > 0 ? (
+          <>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {recipes.map((recipe) => (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onClick={() => handleRecipeClick(recipe)}
+                />
+              ))}
+            </div>
+            {(nextPath || isLoadingMore) && (
+              <div ref={loadMoreRef} className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                <Loader2 className={`mr-2 h-4 w-4 ${isLoadingMore ? "animate-spin" : ""}`} />
+                {isLoadingMore ? "Loading more recipes..." : "Scroll to load more recipes"}
+              </div>
+            )}
+          </>
+        ) : isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground text-lg">Loading recipes...</p>
           </div>
         ) : (
           <div className="text-center py-12">

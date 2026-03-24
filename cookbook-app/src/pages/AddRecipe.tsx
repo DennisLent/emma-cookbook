@@ -141,7 +141,7 @@ function isLikelySourceUrl(value: string | undefined, sourceUrl: string) {
 
 export default function AddRecipe() {
   const navigate = useNavigate();
-  const { recipes, addRecipe } = useRecipes();
+  const { recipes, addRecipe, ensureAllRecipesLoaded } = useRecipes();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -162,6 +162,10 @@ export default function AddRecipe() {
   const [importJob, setImportJob] = useState<RecipeImportJob | null>(null);
   const [isStartingImport, setIsStartingImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    ensureAllRecipesLoaded().catch(() => undefined);
+  }, [ensureAllRecipesLoaded]);
 
   const sideRecipes = recipes.filter((r) => r.isSide);
   const sauceRecipes = recipes.filter((r) => r.isSauce);

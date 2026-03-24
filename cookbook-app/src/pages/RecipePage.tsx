@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { RecipeDetail } from "@/components/RecipeDetail";
@@ -10,10 +10,16 @@ type ViewMode = "detail" | "cook";
 export default function RecipePage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { recipes, isLoading } = useRecipes();
+  const { recipes, isLoading, refreshRecipe } = useRecipes();
   const [viewMode, setViewMode] = useState<ViewMode>("detail");
 
   const recipe = recipes.find((entry) => entry.id === id);
+
+  useEffect(() => {
+    if (id && !recipe) {
+      refreshRecipe(id).catch(() => undefined);
+    }
+  }, [id, recipe, refreshRecipe]);
 
   if (!recipe) {
     return (

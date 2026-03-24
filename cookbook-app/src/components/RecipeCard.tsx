@@ -18,7 +18,14 @@
    const totalTime = (recipe.prepMin || 0) + (recipe.cookMin || 0);
    const { getAverageRating, isFavorite, toggleFavorite } = useSocial();
    const { isAuthenticated } = useAuth();
-   const { average, count } = getAverageRating(recipe.id);
+   const recipeRatings = recipe.ratings || [];
+   const localAverage =
+     recipeRatings.length > 0
+       ? recipeRatings.reduce((sum, rating) => sum + rating.value, 0) / recipeRatings.length
+       : 0;
+   const fallbackRating = getAverageRating(recipe.id);
+   const average = recipeRatings.length > 0 ? localAverage : fallbackRating.average;
+   const count = recipeRatings.length > 0 ? recipeRatings.length : fallbackRating.count;
    const favorite = isFavorite(recipe.id);
  
    const handleFavoriteClick = async (e: React.MouseEvent) => {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, X, Plus, ChefHat, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,10 +38,14 @@ type MatchedRecipe = {
 
 const IngredientMatch = () => {
   const navigate = useNavigate();
-  const { recipes } = useRecipes();
+  const { recipes, ensureAllRecipesLoaded } = useRecipes();
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    ensureAllRecipesLoaded().catch(() => undefined);
+  }, [ensureAllRecipesLoaded]);
 
   // Build a unique, sorted list of all ingredient names across recipes
   const allIngredients = useMemo(() => {
