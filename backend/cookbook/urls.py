@@ -3,10 +3,12 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
+from django.views.static import serve
+from django.urls import re_path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from recipes.views import CollectionViewSet, RecipeImportJobViewSet, RecipeViewSet, TagViewSet, RatingViewSet, CommentViewSet, IngredientViewSet
-from users.views import DatabaseExportView, DatabaseImportView, UserRegisterView, UserDetailView
+from users.views import DatabaseExportView, DatabaseImportView, ExtractionSettingsView, UserRegisterView, UserDetailView, VoskModelUploadView
 
 
 router = DefaultRouter()
@@ -38,7 +40,14 @@ urlpatterns = [
     path('api/users/me/', UserDetailView.as_view(), name='user_detail'),
     path('api/database/export/', DatabaseExportView.as_view(), name='database_export'),
     path('api/database/import/', DatabaseImportView.as_view(), name='database_import'),
+    path('api/settings/extraction-models/', ExtractionSettingsView.as_view(), name='extraction_settings'),
+    path('api/settings/vosk-model-upload/', VoskModelUploadView.as_view(), name='vosk_model_upload'),
 ]
 
-# uploads for images
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# uploads for locally stored media
+if settings.USE_S3_MEDIA_STORAGE:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    urlpatterns += [
+        re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
+    ]

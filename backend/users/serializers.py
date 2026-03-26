@@ -8,6 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='display_name', required=False)
     avatarUrl = serializers.SerializerMethodField()
     prefs = serializers.SerializerMethodField()
+    isSuperuser = serializers.BooleanField(source='is_superuser', read_only=True)
     theme = serializers.JSONField(required=False)
     layout = serializers.JSONField(required=False)
     widget_whitelist = serializers.JSONField(required=False)
@@ -23,6 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
             'name',
             'avatarUrl',
             'prefs',
+            'isSuperuser',
             'first_name',
             'last_name',
             'bio',

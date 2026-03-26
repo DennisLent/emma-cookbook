@@ -1,5 +1,5 @@
 import { Recipe } from "@/types/recipe";
-import { Clock, Users, ChefHat, X, Share2, Trash2, Edit, Heart, Salad, Droplets, FolderPlus, Check } from "lucide-react";
+import { Clock, Users, ChefHat, X, Share2, Trash2, Edit, Heart, Salad, Droplets, FolderPlus, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +36,40 @@ interface RecipeDetailProps {
   recipe: Recipe;
   onClose: () => void;
   onStartCookMode: () => void;
+}
+
+function getSourceLabel(recipe: Recipe) {
+  const normalizedOrigin = recipe.origin?.trim().toLowerCase();
+
+  if (normalizedOrigin === "manual") {
+    return "Manual";
+  }
+  if (normalizedOrigin === "youtube") {
+    return "YouTube";
+  }
+  if (normalizedOrigin === "instagram") {
+    return "Instagram";
+  }
+  if (normalizedOrigin === "tiktok") {
+    return "TikTok";
+  }
+  if (normalizedOrigin === "website") {
+    return "Website";
+  }
+
+  if (recipe.sourceUrl) {
+    try {
+      const hostname = new URL(recipe.sourceUrl).hostname.toLowerCase();
+      if (hostname.includes("youtube.com") || hostname.includes("youtu.be")) return "YouTube";
+      if (hostname.includes("instagram.com")) return "Instagram";
+      if (hostname.includes("tiktok.com")) return "TikTok";
+    } catch {
+      // Ignore malformed URLs and fall through to generic labels.
+    }
+    return "Website";
+  }
+
+  return "Manual";
 }
 
 export const RecipeDetail = ({ recipe, onClose, onStartCookMode }: RecipeDetailProps) => {
@@ -118,6 +152,9 @@ export const RecipeDetail = ({ recipe, onClose, onStartCookMode }: RecipeDetailP
   };
 
   const totalTime = (recipe.prepMin || 0) + (recipe.cookMin || 0);
+  const sourceLabel = getSourceLabel(recipe);
+  const showSourceLink = Boolean(recipe.sourceUrl && sourceLabel !== "Manual");
+  const showManualCreator = !showSourceLink && Boolean(recipe.created_by);
 
   return (
     <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
@@ -273,6 +310,40 @@ export const RecipeDetail = ({ recipe, onClose, onStartCookMode }: RecipeDetailP
                 </div>
               </div>
 
+              {(showSourceLink || showManualCreator) && (
+                <div className="rounded-lg border bg-muted/30 px-4 py-3">
+                  <div className="text-sm font-medium text-foreground">Source</div>
+                  {showSourceLink ? (
+                    <a
+                      href={recipe.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline break-all"
+                    >
+                      {sourceLabel}: {recipe.sourceUrl}
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    </a>
+                  ) : (
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {sourceLabel}: added by <span className="font-medium text-foreground">{recipe.created_by}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {recipe.videoUrl && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-foreground">Recipe Video</div>
+                  <video
+                    src={recipe.videoUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full rounded-xl border bg-black"
+                  />
+                </div>
+              )}
+
              {/* Rating Section */}
              <div className="space-y-2">
                <div className="flex items-center gap-4">
@@ -346,31 +417,37 @@ export const RecipeDetail = ({ recipe, onClose, onStartCookMode }: RecipeDetailP
               {/* Steps */}
               <div className="space-y-4">
                 <h2 className="text-2xl font-semibold">Instructions</h2>
-                <div className="space-y-6">
-                  {recipe.steps.map((step) => (
-                    <div key={step.order} className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm">
-                        {step.order}
+                {recipe.steps.length > 0 ? (
+                  <div className="space-y-6">
+                    {recipe.steps.map((step) => (
+                      <div key={step.order} className="flex gap-4">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm">
+                          {step.order}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <p className="leading-relaxed">{step.text}</p>
+                          {step.imageUrl && (
+                            <img
+                              src={step.imageUrl}
+                              alt={`Step ${step.order}`}
+                              className="rounded-lg border max-h-64 object-cover"
+                            />
+                          )}
+                          {step.timerSec && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="w-4 h-4" />
+                              <span>{Math.floor(step.timerSec / 60)} minutes</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <p className="leading-relaxed">{step.text}</p>
-                        {step.imageUrl && (
-                          <img
-                            src={step.imageUrl}
-                            alt={`Step ${step.order}`}
-                            className="rounded-lg border max-h-64 object-cover"
-                          />
-                        )}
-                        {step.timerSec && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="w-4 h-4" />
-                            <span>{Math.floor(step.timerSec / 60)} minutes</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : recipe.videoUrl ? (
+                  <p className="text-muted-foreground">
+                    This recipe is meant to be followed from the saved video.
+                  </p>
+                ) : null}
               </div>
             </div>
 

@@ -33,6 +33,9 @@ type RecipeImportJob = {
   progressStage: "queued" | "downloading" | "parsing" | "verifying" | "done" | "failed";
   platform: "instagram" | "tiktok" | "youtube";
   sourceUrl: string;
+  videoOnly?: boolean;
+  saveVideo?: boolean;
+  mediaUrl?: string | null;
   errorCode?: string;
   errorMessage?: string;
   result?: RecipeImportJobResult;
@@ -69,6 +72,21 @@ function getImportProgressValue(stage: RecipeImportJob["progressStage"]) {
 function getImportStageDescription(job: RecipeImportJob) {
   if (job.status === "failed") {
     return job.errorMessage || "The importer could not process this video.";
+  }
+
+  if (job.videoOnly) {
+    switch (job.progressStage) {
+      case "queued":
+        return "Your video download is queued and waiting for the worker to pick it up.";
+      case "downloading":
+        return "We are fetching the source video so it can be attached to this recipe.";
+      case "done":
+        return "The video has been attached. Fill in the rest of the recipe manually before saving.";
+      case "failed":
+        return job.errorMessage || "The importer could not process this video.";
+      default:
+        return "Video download in progress.";
+    }
   }
 
   switch (job.progressStage) {
@@ -139,6 +157,23 @@ function isLikelySourceUrl(value: string | undefined, sourceUrl: string) {
   return normalized === sourceUrl || /^https?:\/\//i.test(normalized);
 }
 
+function deriveOrigin(sourceUrl: string, activeTab: string) {
+  if (activeTab !== "link") {
+    return "manual";
+  }
+
+  try {
+    const hostname = new URL(sourceUrl).hostname.toLowerCase();
+    if (hostname.includes("youtube.com") || hostname.includes("youtu.be")) return "youtube";
+    if (hostname.includes("instagram.com")) return "instagram";
+    if (hostname.includes("tiktok.com")) return "tiktok";
+  } catch {
+    // Fall back to website for malformed or partial URLs.
+  }
+
+  return sourceUrl.trim() ? "website" : "manual";
+}
+
 export default function AddRecipe() {
   const navigate = useNavigate();
   const { recipes, addRecipe, ensureAllRecipesLoaded } = useRecipes();
@@ -154,6 +189,7 @@ export default function AddRecipe() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([{ item: "" }]);
   const [steps, setSteps] = useState<Step[]>([{ order: 1, text: "" }]);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [isSide, setIsSide] = useState(false);
   const [isSauce, setIsSauce] = useState(false);
   const [suggestedSideIds, setSuggestedSideIds] = useState<string[]>([]);
@@ -161,6 +197,8 @@ export default function AddRecipe() {
   const [activeTab, setActiveTab] = useState("manual");
   const [importJob, setImportJob] = useState<RecipeImportJob | null>(null);
   const [isStartingImport, setIsStartingImport] = useState(false);
+  const [isSavingVideoOnly, setIsSavingVideoOnly] = useState(false);
+  const [saveVideo, setSaveVideo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -234,10 +272,20 @@ export default function AddRecipe() {
   };
 
   const applyImportedRecipe = (job: RecipeImportJob) => {
+    setSourceUrl(job.sourceUrl);
+    setVideoUrl(job.mediaUrl || "");
+
+    if (job.videoOnly) {
+      setSteps((current) => {
+        const filtered = current.filter((step) => step.text.trim());
+        return filtered.length > 0 ? filtered : [];
+      });
+      return;
+    }
+
     const result = job.result;
     if (!result) return;
 
-    setSourceUrl(job.sourceUrl);
     if (result.title?.trim()) {
       setTitle(result.title.trim());
     }
@@ -260,20 +308,29 @@ export default function AddRecipe() {
     setSteps(splitImportedInstructions(result.instructions));
   };
 
-  const startImportFromLink = async () => {
+  const startImportFromLink = async (videoOnly = false) => {
     if (!sourceUrl.trim()) {
       toast({ title: "Paste a YouTube, Instagram, or TikTok URL first", variant: "destructive" });
       return;
     }
 
-    setIsStartingImport(true);
+    if (videoOnly) {
+      setIsSavingVideoOnly(true);
+    } else {
+      setIsStartingImport(true);
+    }
     try {
       const job = await apiRequest<RecipeImportJob>("/recipe-import-jobs/", {
         method: "POST",
-        body: JSON.stringify({ url: sourceUrl.trim() }),
+        body: JSON.stringify({ url: sourceUrl.trim(), videoOnly, saveVideo: videoOnly || saveVideo }),
       });
       setImportJob(job);
-      toast({ title: "Import started", description: "We are downloading and transcribing the video now." });
+      toast({
+        title: videoOnly ? "Video download started" : "Import started",
+        description: videoOnly
+          ? "We are downloading the source video so you can save it with the recipe."
+          : "We are downloading and transcribing the video now.",
+      });
     } catch (error) {
       toast({
         title: "Failed to start import",
@@ -282,6 +339,7 @@ export default function AddRecipe() {
       });
     } finally {
       setIsStartingImport(false);
+      setIsSavingVideoOnly(false);
     }
   };
 
@@ -298,7 +356,12 @@ export default function AddRecipe() {
         if (nextJob.status === "done") {
           applyImportedRecipe(nextJob);
           window.clearInterval(interval);
-          toast({ title: "Recipe imported", description: "You can review and edit the imported recipe before saving." });
+          toast({
+            title: nextJob.videoOnly ? "Video saved to the draft" : "Recipe imported",
+            description: nextJob.videoOnly
+              ? "Fill in the recipe details manually and save when you are ready."
+              : "You can review and edit the imported recipe before saving.",
+          });
         } else if (nextJob.status === "failed") {
           window.clearInterval(interval);
           toast({
@@ -328,14 +391,15 @@ export default function AddRecipe() {
 
     const filteredIngredients = ingredients.filter((i) => i.item.trim());
     const filteredSteps = steps.filter((s) => s.text.trim());
+    const hasSavedVideo = Boolean(videoUrl.trim());
 
     if (filteredIngredients.length === 0) {
       toast({ title: "Add at least one ingredient", variant: "destructive" });
       return;
     }
 
-    if (filteredSteps.length === 0) {
-      toast({ title: "Add at least one step", variant: "destructive" });
+    if (filteredSteps.length === 0 && !hasSavedVideo) {
+      toast({ title: "Add at least one step or save a video first", variant: "destructive" });
       return;
     }
 
@@ -343,12 +407,14 @@ export default function AddRecipe() {
       await addRecipe({
         title,
         description,
+        origin: deriveOrigin(sourceUrl, activeTab),
         servings,
         prepMin,
         cookMin,
         tags,
         imageUrl,
         sourceUrl,
+        videoUrl,
         ingredients: filteredIngredients,
         steps: filteredSteps,
         isSide,
@@ -688,18 +754,43 @@ export default function AddRecipe() {
                     placeholder="Paste YouTube, Instagram, TikTok, or website URL"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Paste a public YouTube, Instagram, or TikTok URL to import ingredients and steps automatically. Website links can still be saved manually.
+                    Paste a public YouTube, Instagram, or TikTok URL to import ingredients and steps automatically. You can also keep the source video with the recipe, or save the video alone and fill everything else in manually.
                   </p>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/30 p-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="saveVideo" className="text-sm font-medium">
+                      Save video
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Keep the downloaded video on the recipe after import finishes.
+                    </p>
+                  </div>
+                  <Switch
+                    id="saveVideo"
+                    checked={saveVideo}
+                    onCheckedChange={(checked) => setSaveVideo(Boolean(checked))}
+                  />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
-                    onClick={startImportFromLink}
-                    disabled={isStartingImport || importIsActive || !canImportFromLink}
+                    onClick={() => startImportFromLink(false)}
+                    disabled={isStartingImport || isSavingVideoOnly || importIsActive || !canImportFromLink}
                   >
-                    {(isStartingImport || importIsActive) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {(isStartingImport || importIsActive) && !isSavingVideoOnly && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     Import Recipe
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => startImportFromLink(true)}
+                    disabled={isStartingImport || isSavingVideoOnly || importIsActive || !canImportFromLink}
+                  >
+                    {(isSavingVideoOnly || importIsActive) && !isStartingImport && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Save Video
                   </Button>
                   {!canImportFromLink && sourceUrl.trim() && (
                     <p className="text-sm text-muted-foreground">
@@ -746,6 +837,19 @@ export default function AddRecipe() {
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {videoUrl && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Saved recipe video</p>
+                    <video
+                      src={videoUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full rounded-lg border bg-black"
+                    />
                   </div>
                 )}
 

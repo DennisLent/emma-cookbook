@@ -20,12 +20,15 @@ export type Recipe = {
   id: string;
   title: string;
   description?: string;
+  created_by?: string;
+  origin?: string;
   servings: number;
   prepMin?: number;
   cookMin?: number;
   tags: string[];
   imageUrl?: string;
   sourceUrl?: string;
+  videoUrl?: string;
   ingredients: Ingredient[];
   steps: Step[];
   /** Mark this recipe as a side dish */

@@ -466,6 +466,8 @@ class RecipeImportJobViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         source_url = serializer.validated_data["url"]
+        download_only = serializer.validated_data.get("videoOnly", False)
+        persist_media = serializer.validated_data.get("saveVideo", False)
 
         try:
             platform = validate_public_video_url(source_url)
@@ -483,6 +485,8 @@ class RecipeImportJobViewSet(viewsets.GenericViewSet):
                 source_url=source_url,
                 platform=platform,
                 status=RecipeImportJob.STATUS_QUEUED,
+                download_only=download_only,
+                persist_media=persist_media,
             )
 
             def enqueue():

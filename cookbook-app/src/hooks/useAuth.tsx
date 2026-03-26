@@ -17,6 +17,7 @@ type User = {
   username: string;
   email?: string;
   avatarUrl?: string;
+  isSuperuser?: boolean;
   prefs: UserPrefs;
   favoriteRecipeIds?: string[];
 };
@@ -37,6 +38,7 @@ type BackendUser = {
   name?: string;
   display_name?: string;
   avatarUrl?: string | null;
+  isSuperuser?: boolean;
   prefs?: Partial<UserPrefs>;
   favorite_recipe_ids?: string[];
 };
@@ -60,6 +62,7 @@ function normalizeUser(data: BackendUser): User {
     name: data.name || data.display_name || data.username,
     email: data.email,
     avatarUrl: data.avatarUrl || undefined,
+    isSuperuser: Boolean(data.isSuperuser),
     favoriteRecipeIds: (data.favorite_recipe_ids || []).map((id) => String(id)),
     prefs: {
       ...DEFAULT_PREFS,

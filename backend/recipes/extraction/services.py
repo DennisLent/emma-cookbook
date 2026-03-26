@@ -1,5 +1,3 @@
-from django.conf import settings
-
 from .utils import (
     get_yt_transcript_cleaned,
     extract_recipe_via_ollama,
@@ -8,7 +6,7 @@ import re
 from tempfile import TemporaryDirectory
 from recipe_scrapers import scrape_me
 from ingredient_parser import parse_ingredient
-from recipes.models import Ingredient
+from recipes.models import Ingredient, get_effective_ollama_model, get_effective_vosk_model_path
 from .utils import download_public_video, extract_audio_from_video, normalize_transcript_text, transcribe_wav_with_vosk, validate_public_video_url
 
 
@@ -114,7 +112,7 @@ def extract_recipe_from_website(url: str) -> dict:
     }
 
 def extract_recipe_from_youtube(url: str, model: str | None = None) -> dict | None:
-    model = model or settings.OLLAMA_DEFAULT_MODEL
+    model = model or get_effective_ollama_model()
     transcript = get_yt_transcript_cleaned(url)
     if len(transcript.split()) < 50:
         return None
@@ -124,7 +122,7 @@ def extract_recipe_from_youtube(url: str, model: str | None = None) -> dict | No
 
 
 def extract_recipe_from_transcript(transcript: str, source_url: str, model: str | None = None) -> dict | None:
-    model = model or settings.OLLAMA_DEFAULT_MODEL
+    model = model or get_effective_ollama_model()
     if not transcript or len(transcript.split()) < 50:
         return None
 
@@ -133,7 +131,7 @@ def extract_recipe_from_transcript(transcript: str, source_url: str, model: str 
 
 
 def extract_recipe_from_instagram(url: str, model: str | None = None) -> dict | None:
-    model = model or settings.OLLAMA_DEFAULT_MODEL
+    model = model or get_effective_ollama_model()
     platform = validate_public_video_url(url)
     if platform != "instagram":
         raise ValueError("The provided URL is not a supported Instagram URL.")
@@ -141,12 +139,14 @@ def extract_recipe_from_instagram(url: str, model: str | None = None) -> dict | 
     with TemporaryDirectory(prefix="instagram-import-") as tmpdir:
         video_path, _ = download_public_video(url, tmpdir)
         audio_path = extract_audio_from_video(video_path)
-        transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
+        transcript = normalize_transcript_text(
+            transcribe_wav_with_vosk(audio_path, model_path=get_effective_vosk_model_path())
+        )
         return extract_recipe_from_transcript(transcript=transcript, source_url=url, model=model)
 
 
 def extract_recipe_from_tiktok(url: str, model: str | None = None) -> dict | None:
-    model = model or settings.OLLAMA_DEFAULT_MODEL
+    model = model or get_effective_ollama_model()
     platform = validate_public_video_url(url)
     if platform != "tiktok":
         raise ValueError("The provided URL is not a supported TikTok URL.")
@@ -154,5 +154,7 @@ def extract_recipe_from_tiktok(url: str, model: str | None = None) -> dict | Non
     with TemporaryDirectory(prefix="tiktok-import-") as tmpdir:
         video_path, _ = download_public_video(url, tmpdir)
         audio_path = extract_audio_from_video(video_path)
-        transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
+        transcript = normalize_transcript_text(
+            transcribe_wav_with_vosk(audio_path, model_path=get_effective_vosk_model_path())
+        )
         return extract_recipe_from_transcript(transcript=transcript, source_url=url, model=model)

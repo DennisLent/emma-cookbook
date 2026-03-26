@@ -127,10 +127,12 @@ class RecipeSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
 
+    origin = serializers.CharField(required=False, allow_blank=True)
     prepMin = serializers.IntegerField(source="prep_minutes", required=False, allow_null=True)
     cookMin = serializers.IntegerField(source="cook_minutes", required=False, allow_null=True)
     imageUrl = serializers.CharField(source="image_url", required=False, allow_blank=True)
     sourceUrl = serializers.CharField(source="source_url", required=False, allow_blank=True)
+    videoUrl = serializers.CharField(source="video_url", required=False, allow_blank=True)
     isSide = serializers.BooleanField(source="is_side", required=False)
     isSauce = serializers.BooleanField(source="is_sauce", required=False)
     suggestedSideIds = serializers.PrimaryKeyRelatedField(
@@ -167,11 +169,13 @@ class RecipeSerializer(serializers.ModelSerializer):
             "created_by",
             "createdAt",
             "updatedAt",
+            "origin",
             "servings",
             "prepMin",
             "cookMin",
             "imageUrl",
             "sourceUrl",
+            "videoUrl",
             "isSide",
             "isSauce",
             "suggestedSideIds",
@@ -209,6 +213,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         steps = attrs.get("steps")
         suggested_sides = attrs.get("suggested_sides")
         suggested_sauces = attrs.get("suggested_sauces")
+        has_video = bool(attrs.get("video_url", getattr(self.instance, "video_url", "")))
 
         if ingredients is None and "ingredients_data" in self.initial_data:
             ingredients = [
@@ -234,7 +239,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             if not attrs.get("recipe_ingredients"):
                 raise serializers.ValidationError({"ingredients": "At least one ingredient is required."})
         if self.instance is None or steps is not None:
-            if not attrs.get("steps"):
+            if not attrs.get("steps") and not has_video:
                 raise serializers.ValidationError({"steps": "At least one step is required."})
 
         # Side/sauce suggestions are persisted product features, so invalid
@@ -418,6 +423,13 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 class RecipeImportJobCreateSerializer(serializers.Serializer):
     url = serializers.URLField(max_length=1000)
+    videoOnly = serializers.BooleanField(required=False, default=False)
+    saveVideo = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if attrs.get("videoOnly"):
+            attrs["saveVideo"] = True
+        return attrs
 
 
 class RecipeImportJobSerializer(serializers.ModelSerializer):
@@ -433,6 +445,8 @@ class RecipeImportJobSerializer(serializers.ModelSerializer):
     errorMessage = serializers.CharField(source="error_message", read_only=True)
     fileSizeBytes = serializers.IntegerField(source="file_size_bytes", read_only=True)
     progressStage = serializers.CharField(source="progress_stage", read_only=True)
+    videoOnly = serializers.BooleanField(source="download_only", read_only=True)
+    saveVideo = serializers.BooleanField(source="persist_media", read_only=True)
 
     class Meta:
         model = RecipeImportJob
@@ -442,6 +456,8 @@ class RecipeImportJobSerializer(serializers.ModelSerializer):
             "progressStage",
             "platform",
             "sourceUrl",
+            "videoOnly",
+            "saveVideo",
             "mediaUrl",
             "audioUrl",
             "result",

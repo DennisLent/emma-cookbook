@@ -44,7 +44,11 @@ SECRET_KEY = config('SECRET_KEY', default='dev-secret-key')
 DEBUG = config_bool('DEBUG', default=False)
 USE_S3_MEDIA_STORAGE = config_bool('USE_S3_MEDIA_STORAGE', default=False)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='127.0.0.1,localhost,testserver')
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    cast=Csv(),
+    default='127.0.0.1,localhost,testserver,backend,frontend',
+)
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -271,6 +275,8 @@ KEYCLOAK_JWKS_URL = config(
 )
 KEYCLOAK_ADMIN_ROLE = config('KEYCLOAK_ADMIN_ROLE', default='cookbook-admin')
 OLLAMA_DEFAULT_MODEL = config('OLLAMA_DEFAULT_MODEL', default='llama3.2')
+OLLAMA_HOST = config('OLLAMA_HOST', default='http://localhost:11434')
+VOSK_MODEL_PATH = config('VOSK_MODEL_PATH', default='')
 
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=CELERY_BROKER_URL)
@@ -290,3 +296,6 @@ RECIPE_IMPORT_ALLOWED_HOSTS = config(
     cast=Csv(),
     default='instagram.com,www.instagram.com,m.instagram.com,tiktok.com,www.tiktok.com,m.tiktok.com,vm.tiktok.com,youtube.com,www.youtube.com,m.youtube.com,youtu.be',
 )
+VOSK_MODEL_UPLOAD_MAX_ARCHIVE_BYTES = config('VOSK_MODEL_UPLOAD_MAX_ARCHIVE_BYTES', cast=int, default=1073741824)
+VOSK_MODEL_UPLOAD_MAX_EXTRACTED_BYTES = config('VOSK_MODEL_UPLOAD_MAX_EXTRACTED_BYTES', cast=int, default=2147483648)
+VOSK_MODEL_UPLOAD_MAX_FILE_COUNT = config('VOSK_MODEL_UPLOAD_MAX_FILE_COUNT', cast=int, default=5000)

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -111,6 +112,37 @@ class Recipe(models.Model):
         return self.title
 
 
+class ExtractionSettings(models.Model):
+    ollama_model = models.CharField(max_length=255)
+    vosk_model_path = models.CharField(max_length=1024)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Extraction settings"
+
+    def __str__(self):
+        return "Extraction settings"
+
+    @classmethod
+    def get_solo(cls):
+        return cls.objects.order_by("pk").first()
+
+
+def get_effective_ollama_model() -> str:
+    current = ExtractionSettings.get_solo()
+    if current and current.ollama_model.strip():
+        return current.ollama_model.strip()
+    return settings.OLLAMA_DEFAULT_MODEL
+
+
+def get_effective_vosk_model_path() -> str:
+    current = ExtractionSettings.get_solo()
+    if current and current.vosk_model_path.strip():
+        return current.vosk_model_path.strip()
+    return getattr(settings, "VOSK_MODEL_PATH", "") or ""
+
+
 class RecipeImportJob(models.Model):
     STATUS_QUEUED = "queued"
     STATUS_RUNNING = "running"
@@ -156,6 +188,8 @@ class RecipeImportJob(models.Model):
     audio_file = models.FileField(upload_to="recipe_imports/audio/", blank=True)
     transcript = models.TextField(blank=True)
     extracted_recipe = models.JSONField(default=dict, blank=True)
+    download_only = models.BooleanField(default=False)
+    persist_media = models.BooleanField(default=False)
     celery_task_id = models.CharField(max_length=255, blank=True)
     file_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)

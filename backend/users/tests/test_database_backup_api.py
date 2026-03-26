@@ -1,12 +1,17 @@
 import json
+from io import BytesIO
+from pathlib import Path
+import zipfile
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from recipes.models import Ingredient, Recipe
+from recipes.models import ExtractionSettings, Ingredient, Recipe
 
 
 class DatabaseBackupApiTests(APITestCase):
@@ -106,3 +111,108 @@ class DatabaseBackupApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["error"]["code"], "invalid_backup_file")
+
+
+class VoskModelUploadApiTests(APITestCase):
+    def setUp(self):
+        self.admin = get_user_model().objects.create_user(
+            username="admin",
+            password="secret123",
+            role="admin",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.user = get_user_model().objects.create_user(username="chef", password="secret123")
+
+    @override_settings(VOSK_MODEL_PATH="/tmp/test-vosk-model")
+    def test_superuser_can_upload_and_replace_vosk_model(self):
+        self.client.force_authenticate(self.admin)
+
+        archive = BytesIO()
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("vosk-model-small/README", "model")
+            zf.writestr("vosk-model-small/conf/model.conf", "config")
+        archive.seek(0)
+
+        response = self.client.post(
+            reverse("vosk_model_upload"),
+            {"file": SimpleUploadedFile("vosk.zip", archive.read(), content_type="application/zip")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Path("/tmp/test-vosk-model/README").exists())
+        self.assertTrue(Path("/tmp/test-vosk-model/conf/model.conf").exists())
+        self.assertEqual(ExtractionSettings.get_solo().vosk_model_path, "/tmp/test-vosk-model")
+
+    def test_non_superuser_cannot_upload_vosk_model(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post(reverse("vosk_model_upload"), {}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(VOSK_MODEL_PATH="/tmp/test-vosk-model")
+    def test_vosk_upload_rejects_path_traversal_archive(self):
+        self.client.force_authenticate(self.admin)
+
+        archive = BytesIO()
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("../escape.txt", "bad")
+        archive.seek(0)
+
+        response = self.client.post(
+            reverse("vosk_model_upload"),
+            {"file": SimpleUploadedFile("vosk.zip", archive.read(), content_type="application/zip")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"]["code"], "invalid_vosk_archive")
+        self.assertFalse(Path("/tmp/escape.txt").exists())
+
+    @override_settings(
+        VOSK_MODEL_PATH="/tmp/test-vosk-model",
+        VOSK_MODEL_UPLOAD_MAX_ARCHIVE_BYTES=10,
+    )
+    def test_vosk_upload_rejects_oversized_archive(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            reverse("vosk_model_upload"),
+            {"file": SimpleUploadedFile("vosk.zip", b"x" * 20, content_type="application/zip")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"]["code"], "vosk_archive_too_large")
+
+
+class ExtractionSettingsApiTests(APITestCase):
+    def setUp(self):
+        self.admin = get_user_model().objects.create_user(
+            username="admin",
+            password="secret123",
+            role="admin",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.user = get_user_model().objects.create_user(username="chef", password="secret123")
+
+    @patch("users.views._fetch_ollama_models", return_value=[{"name": "llama3.2", "isActive": True}])
+    @override_settings(VOSK_MODEL_PATH="/tmp/test-vosk-model")
+    def test_superuser_can_update_extraction_settings(self, _models_mock):
+        Path("/tmp/test-vosk-model").mkdir(parents=True, exist_ok=True)
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.patch(
+            reverse("extraction_settings"),
+            {"ollamaModel": "llama3.2", "voskModelPath": "/tmp/test-vosk-model"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["ollamaModel"], "llama3.2")
+        self.assertEqual(response.data["voskModelPath"], "/tmp/test-vosk-model")
+
+    def test_non_superuser_cannot_update_extraction_settings(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.patch(reverse("extraction_settings"), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
