@@ -82,6 +82,7 @@ describe("RecipeDetail", () => {
     id: "main-1",
     title: "Main Dish",
     description: "Main description",
+    created_by: "dennis",
     servings: 4,
     tags: ["Dinner"],
     ingredients: [{ item: "chicken" }],
@@ -105,5 +106,53 @@ describe("RecipeDetail", () => {
     expect(screen.getByText("Garlic Yogurt Sauce")).toBeInTheDocument();
 
     await user.click(screen.getByText("Start Cook Mode"));
+  });
+
+  it("shows the creator for manual recipes", () => {
+    render(
+      <MemoryRouter>
+        <RecipeDetail recipe={recipe} onClose={vi.fn()} onStartCookMode={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Source")).toBeInTheDocument();
+    expect(screen.getByText(/Manual: added by/i)).toBeInTheDocument();
+    expect(screen.getByText("dennis")).toBeInTheDocument();
+  });
+
+  it("shows the saved source link for imported recipes", () => {
+    render(
+      <MemoryRouter>
+        <RecipeDetail
+          recipe={{
+            ...recipe,
+            origin: "youtube",
+            sourceUrl: "https://www.youtube.com/watch?v=abc123",
+          }}
+          onClose={vi.fn()}
+          onStartCookMode={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: /YouTube: https:\/\/www\.youtube\.com\/watch\?v=abc123/i })).toBeInTheDocument();
+  });
+
+  it("renders a saved recipe video when available", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <RecipeDetail
+          recipe={{
+            ...recipe,
+            videoUrl: "https://cdn.example.com/recipe.mp4",
+          }}
+          onClose={vi.fn()}
+          onStartCookMode={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Recipe Video")).toBeInTheDocument();
+    expect(container.querySelector("video")).toBeInTheDocument();
   });
 });

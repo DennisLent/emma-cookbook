@@ -14,7 +14,7 @@ from .extraction.utils import (
     normalize_transcript_text,
     transcribe_wav_with_vosk,
 )
-from .models import RecipeImportJob
+from .models import RecipeImportJob, get_effective_vosk_model_path
 
 
 @shared_task(bind=True, autoretry_for=(), retry_backoff=False, max_retries=5)
@@ -36,29 +36,37 @@ def process_recipe_import_job(self, job_id: int):
     try:
         with TemporaryDirectory(prefix=f"recipe-import-{job.pk}-") as tmpdir:
             video_path, file_size = download_public_video(job.source_url, tmpdir)
-            job.progress_stage = RecipeImportJob.STAGE_PARSING
-            job.save(update_fields=["progress_stage", "updated_at"])
-            audio_path = extract_audio_from_video(video_path)
-            transcript = normalize_transcript_text(transcribe_wav_with_vosk(audio_path))
-            extracted_recipe = extract_recipe_from_transcript(transcript=transcript, source_url=job.source_url)
-            job.progress_stage = RecipeImportJob.STAGE_VERIFYING
-            job.save(update_fields=["progress_stage", "updated_at"])
-
-            if extracted_recipe is None:
-                raise PublicVideoDownloadError(
-                    "recipe_not_found",
-                    "No recipe data could be extracted from the video's transcript.",
-                )
-
             with transaction.atomic():
-                with open(video_path, "rb") as video_handle:
-                    job.media_file.save(Path(video_path).name, File(video_handle), save=False)
-                with open(audio_path, "rb") as audio_handle:
-                    job.audio_file.save(Path(audio_path).name, File(audio_handle), save=False)
-
                 job.file_size_bytes = file_size
-                job.transcript = transcript
-                job.extracted_recipe = extracted_recipe
+                job.transcript = ""
+                job.extracted_recipe = {}
+                job.media_file = ""
+                job.audio_file = ""
+
+                if job.persist_media:
+                    with open(video_path, "rb") as video_handle:
+                        job.media_file.save(Path(video_path).name, File(video_handle), save=False)
+
+                if not job.download_only:
+                    job.progress_stage = RecipeImportJob.STAGE_PARSING
+                    job.save(update_fields=["progress_stage", "updated_at"])
+                    audio_path = extract_audio_from_video(video_path)
+                    transcript = normalize_transcript_text(
+                        transcribe_wav_with_vosk(audio_path, model_path=get_effective_vosk_model_path())
+                    )
+                    extracted_recipe = extract_recipe_from_transcript(transcript=transcript, source_url=job.source_url)
+                    job.progress_stage = RecipeImportJob.STAGE_VERIFYING
+                    job.save(update_fields=["progress_stage", "updated_at"])
+
+                    if extracted_recipe is None:
+                        raise PublicVideoDownloadError(
+                            "recipe_not_found",
+                            "No recipe data could be extracted from the video's transcript.",
+                        )
+
+                    job.transcript = transcript
+                    job.extracted_recipe = extracted_recipe
+
                 job.status = RecipeImportJob.STATUS_DONE
                 job.progress_stage = RecipeImportJob.STAGE_DONE
                 job.finished_at = timezone.now()

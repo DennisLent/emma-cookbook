@@ -80,8 +80,8 @@ class LiveRecipeImportSmokeTests(APITestCase):
         self.assertEqual(detail_payload["status"], "done")
         self.assertEqual(detail_payload["platform"], "tiktok")
         self.assertEqual(detail_payload["result"]["title"], "Smoke Test Recipe")
-        self.assertTrue(detail_payload["mediaUrl"])
-        self.assertTrue(detail_payload["audioUrl"])
+        self.assertFalse(detail_payload["mediaUrl"])
+        self.assertFalse(detail_payload["audioUrl"])
         self.assertTrue(detail_payload["transcript"])
 
     @patch("recipes.extraction.utils.llm.ollama.chat", side_effect=fake_ollama_chat)

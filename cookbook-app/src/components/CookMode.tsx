@@ -10,6 +10,25 @@ interface CookModeProps {
   onClose: () => void;
 }
 
+function parseQuantityValue(raw: string) {
+  const trimmed = raw.trim();
+  if (/^\d+\.\d+$/.test(trimmed) || /^\d+$/.test(trimmed)) {
+    return Number(trimmed);
+  }
+
+  const fractionMatch = trimmed.match(/^(\d+)\/(\d+)$/);
+  if (!fractionMatch) {
+    return null;
+  }
+
+  const numerator = Number(fractionMatch[1]);
+  const denominator = Number(fractionMatch[2]);
+  if (!denominator) {
+    return null;
+  }
+  return numerator / denominator;
+}
+
 export const CookMode = ({ recipe, onClose }: CookModeProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [servings, setServings] = useState(recipe.servings);
@@ -88,7 +107,10 @@ export const CookMode = ({ recipe, onClose }: CookModeProps) => {
     if (!ingredient.qty) return ingredient;
     const qtyMatch = ingredient.qty.match(/^(\d+(?:\/\d+)?|\d+\.\d+)/);
     if (qtyMatch) {
-      const num = eval(qtyMatch[1]);
+      const num = parseQuantityValue(qtyMatch[1]);
+      if (num === null) {
+        return ingredient;
+      }
       const scaled = (num * servingMultiplier).toFixed(2).replace(/\.?0+$/, "");
       return {
         ...ingredient,
@@ -208,6 +230,7 @@ export const CookMode = ({ recipe, onClose }: CookModeProps) => {
                   <Button
                     variant="outline"
                     size="icon"
+                    aria-label="Decrease servings"
                     onClick={() => setServings(Math.max(1, servings - 1))}
                     disabled={servings <= 1}
                   >
@@ -217,6 +240,7 @@ export const CookMode = ({ recipe, onClose }: CookModeProps) => {
                   <Button
                     variant="outline"
                     size="icon"
+                    aria-label="Increase servings"
                     onClick={() => setServings(servings + 1)}
                   >
                     <Plus className="w-4 h-4" />

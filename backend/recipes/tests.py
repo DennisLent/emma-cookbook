@@ -37,6 +37,44 @@ class RecipeImportJobApiTests(APITestCase):
         delay_mock.assert_called_once_with(job.pk)
         validate_mock.assert_called_once()
 
+    @patch("recipes.extraction.utils.validate_public_video_url", return_value="tiktok")
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_supports_video_only_mode(self, delay_mock, validate_mock):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.tiktok.com/@cook/video/123", "videoOnly": True},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        job = RecipeImportJob.objects.get()
+        self.assertTrue(job.download_only)
+        self.assertTrue(job.persist_media)
+        self.assertTrue(response.data["videoOnly"])
+        self.assertTrue(response.data["saveVideo"])
+        delay_mock.assert_called_once_with(job.pk)
+        validate_mock.assert_called_once()
+
+    @patch("recipes.extraction.utils.validate_public_video_url", return_value="instagram")
+    @patch("recipes.tasks.process_recipe_import_job.delay")
+    def test_create_recipe_import_job_supports_save_video_without_skipping_extraction(self, delay_mock, validate_mock):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("recipe-import-job-list"),
+                {"url": "https://www.instagram.com/reel/abc123/", "saveVideo": True},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        job = RecipeImportJob.objects.get()
+        self.assertFalse(job.download_only)
+        self.assertTrue(job.persist_media)
+        self.assertFalse(response.data["videoOnly"])
+        self.assertTrue(response.data["saveVideo"])
+        delay_mock.assert_called_once_with(job.pk)
+        validate_mock.assert_called_once()
+
     def test_create_recipe_import_job_rejects_unsupported_host(self):
         response = self.client.post(
             reverse("recipe-import-job-list"),
@@ -142,8 +180,60 @@ class RecipeImportJobTaskTests(APITestCase):
         self.assertEqual(job.status, RecipeImportJob.STATUS_DONE)
         self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DONE)
         self.assertEqual(job.file_size_bytes, 5)
+        self.assertFalse(job.media_file.name)
+        self.assertFalse(job.audio_file.name)
+        self.assertEqual(job.extracted_recipe["title"], "Test Recipe")
+        transcribe_mock.assert_called_once()
+
+    @patch("recipes.tasks.extract_recipe_from_transcript")
+    @patch("recipes.tasks.transcribe_wav_with_vosk", return_value="mix flour with eggs and bake for twenty minutes " * 5)
+    @patch("recipes.tasks.extract_audio_from_video")
+    @patch("recipes.tasks.download_public_video")
+    def test_process_recipe_import_job_persists_video_only_when_requested(
+        self,
+        download_mock,
+        extract_audio_mock,
+        transcribe_mock,
+        extract_recipe_mock,
+    ):
+        job = RecipeImportJob.objects.create(
+            user=self.user,
+            source_url="https://www.instagram.com/reel/abc123/",
+            platform=RecipeImportJob.PLATFORM_INSTAGRAM,
+            persist_media=True,
+        )
+
+        def fake_download(_url, target_dir):
+            video_path = f"{target_dir}/clip.mp4"
+            with open(video_path, "wb") as handle:
+                handle.write(b"video")
+            return video_path, 5
+
+        def fake_audio(video_path):
+            audio_path = video_path.replace(".mp4", ".wav")
+            with open(audio_path, "wb") as handle:
+                handle.write(b"audio")
+            return audio_path
+
+        download_mock.side_effect = fake_download
+        extract_audio_mock.side_effect = fake_audio
+        extract_recipe_mock.return_value = {
+            "title": "Test Recipe",
+            "description": "https://www.instagram.com/reel/abc123/",
+            "instructions": "Mix\nBake",
+            "ingredients_data": [{"ingredient": "Flour", "amount": "1 cup"}],
+            "tags": [],
+            "image": None,
+        }
+
+        from recipes.tasks import process_recipe_import_job
+
+        process_recipe_import_job.run(job.pk)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, RecipeImportJob.STATUS_DONE)
         self.assertTrue(job.media_file.name)
-        self.assertTrue(job.audio_file.name)
+        self.assertFalse(job.audio_file.name)
         self.assertEqual(job.extracted_recipe["title"], "Test Recipe")
         transcribe_mock.assert_called_once()
 
@@ -166,6 +256,45 @@ class RecipeImportJobTaskTests(APITestCase):
         self.assertEqual(job.status, RecipeImportJob.STATUS_FAILED)
         self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DOWNLOADING)
         self.assertEqual(job.error_code, "authentication_required")
+
+    @patch("recipes.tasks.transcribe_wav_with_vosk")
+    @patch("recipes.tasks.extract_audio_from_video")
+    @patch("recipes.tasks.download_public_video")
+    def test_process_recipe_import_job_download_only_saves_video_without_parsing(
+        self,
+        download_mock,
+        extract_audio_mock,
+        transcribe_mock,
+    ):
+        job = RecipeImportJob.objects.create(
+            user=self.user,
+            source_url="https://www.instagram.com/reel/video-only/",
+            platform=RecipeImportJob.PLATFORM_INSTAGRAM,
+            download_only=True,
+        )
+
+        def fake_download(_url, target_dir):
+            video_path = f"{target_dir}/clip.mp4"
+            with open(video_path, "wb") as handle:
+                handle.write(b"video")
+            return video_path, 5
+
+        download_mock.side_effect = fake_download
+
+        from recipes.tasks import process_recipe_import_job
+
+        process_recipe_import_job.run(job.pk)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, RecipeImportJob.STATUS_DONE)
+        self.assertEqual(job.progress_stage, RecipeImportJob.STAGE_DONE)
+        self.assertEqual(job.file_size_bytes, 5)
+        self.assertTrue(job.media_file.name)
+        self.assertFalse(job.audio_file.name)
+        self.assertEqual(job.transcript, "")
+        self.assertEqual(job.extracted_recipe, {})
+        extract_audio_mock.assert_not_called()
+        transcribe_mock.assert_not_called()
 
     def test_process_recipe_import_job_retries_when_job_is_not_visible_yet(self):
         from celery.exceptions import Retry

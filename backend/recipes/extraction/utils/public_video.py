@@ -113,13 +113,13 @@ def extract_audio_from_video(video_path: str) -> str:
     return wav_path
 
 
-def _find_vosk_model() -> str:
-    env_path = os.environ.get("VOSK_MODEL_PATH")
-    if env_path:
-        path = Path(env_path)
+def _find_vosk_model(model_path: str | None = None) -> str:
+    configured_path = model_path or os.environ.get("VOSK_MODEL_PATH")
+    if configured_path:
+        path = Path(configured_path)
         if path.is_dir():
             return str(path.resolve())
-        raise PublicVideoDownloadError("vosk_model_missing", f"VOSK_MODEL_PATH points to {env_path}, but it is not a directory.")
+        raise PublicVideoDownloadError("vosk_model_missing", f"Vosk model path points to {configured_path}, but it is not a directory.")
 
     current_dir = Path(__file__).parent
     model_dirs = [entry for entry in current_dir.iterdir() if entry.is_dir() and entry.name.startswith("vosk-model")]
@@ -131,17 +131,17 @@ def _find_vosk_model() -> str:
     return str(model_dirs[0].resolve())
 
 
-@lru_cache(maxsize=1)
-def get_vosk_model() -> Model:
-    return Model(_find_vosk_model())
+@lru_cache(maxsize=8)
+def get_vosk_model(model_path: str | None = None) -> Model:
+    return Model(_find_vosk_model(model_path))
 
 
-def transcribe_wav_with_vosk(wav_path: str) -> str:
+def transcribe_wav_with_vosk(wav_path: str, model_path: str | None = None) -> str:
     with wave.open(wav_path, "rb") as wav_file:
         if wav_file.getnchannels() != 1 or wav_file.getframerate() not in (8000, 16000, 32000):
             raise PublicVideoDownloadError("invalid_audio_format", "Vosk requires mono WAV audio at 8, 16, or 32 kHz.")
 
-        recognizer = KaldiRecognizer(get_vosk_model(), wav_file.getframerate())
+        recognizer = KaldiRecognizer(get_vosk_model(model_path), wav_file.getframerate())
         recognizer.SetWords(True)
         segments = []
 

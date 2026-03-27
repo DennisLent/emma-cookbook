@@ -54,6 +54,6 @@ It creates a production env file, prepares the Vosk model, optionally imports an
 
 When changes are made to the project or to the env file, rebuild the entire stack using:
 
-```
+```sh
 ENV_FILE=.env.production docker compose up --build -d
 ```

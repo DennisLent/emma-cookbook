@@ -1,6 +1,6 @@
 SECRET_KEY=dev-secret-key-for-internal-testing-only-123456
 DEBUG=True
-ALLOWED_HOSTS=127.0.0.1,localhost,testserver
+ALLOWED_HOSTS=127.0.0.1,localhost,testserver,backend,frontend
 CORS_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:4200,http://127.0.0.1:4200
 
 POSTGRES_DB=cookbook
