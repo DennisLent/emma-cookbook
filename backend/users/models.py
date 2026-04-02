@@ -1,3 +1,5 @@
+"""User-account and deployment-status models for the application."""
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -32,3 +34,27 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+
+
+class AppUpdateStatus(models.Model):
+    current_version = models.CharField(max_length=64, blank=True)
+    latest_version = models.CharField(max_length=64, blank=True)
+    repository = models.CharField(max_length=255, blank=True)
+    release_url = models.URLField(blank=True)
+    update_available = models.BooleanField(default=False)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    dismissed_version = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "App update status"
+        verbose_name_plural = "App update status"
+
+    @classmethod
+    def get_solo(cls):
+        return cls.objects.order_by("pk").first()
+
+    def __str__(self):
+        return "App update status"

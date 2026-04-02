@@ -1,3 +1,5 @@
+"""Meal-plan generation helpers shared by the meal-plan API endpoints."""
+
 import random
 from collections import defaultdict, deque
 from typing import List

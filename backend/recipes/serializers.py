@@ -1,3 +1,5 @@
+"""Serializers that translate recipe-domain models to the public API shape."""
+
 from django.db.models import Avg
 from django.db import connection
 from django.utils.text import slugify

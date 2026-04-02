@@ -1,3 +1,5 @@
+// Compact recipe summary card used throughout browse and search results.
+
  import { Recipe } from "@/types/recipe";
  import { Clock, Users, Heart } from "lucide-react";
  import { Card, CardContent } from "@/components/ui/card";

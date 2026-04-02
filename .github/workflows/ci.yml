@@ -26,7 +26,7 @@ jobs:
       - name: Run migrations
         run: python manage.py migrate --noinput
       - name: Run backend tests
-        run: python manage.py test users.tests.test_tag_inference recipes.tests_contract
+        run: python manage.py test users.tests.test_tag_inference users.tests.test_app_version_api users.tests.test_app_update_api users.tests.test_change_password_api recipes.tests_contract
 
   live-import-smoke:
     runs-on: ubuntu-latest

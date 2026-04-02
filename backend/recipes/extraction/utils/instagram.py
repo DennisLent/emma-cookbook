@@ -1,3 +1,5 @@
+"""Instagram-specific wrappers around the shared public-video extraction helpers."""
+
 from .public_video import (
     PublicVideoDownloadError,
     download_public_video,

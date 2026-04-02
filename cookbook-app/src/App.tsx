@@ -1,3 +1,5 @@
+// Root application shell that wires together providers, notifications, and routes.
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +10,7 @@ import { SettingsProvider } from "@/hooks/useSettings";
 import { AuthProvider } from "@/hooks/useAuth";
 import { SocialProvider } from "@/hooks/useSocial";
 import { CollectionsProvider } from "@/hooks/useCollections";
+import { UpdateNotifier } from "@/components/UpdateNotifier";
 import Index from "./pages/Index";
 import AddRecipe from "./pages/AddRecipe";
 import EditRecipe from "./pages/EditRecipe";
@@ -32,6 +35,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <UpdateNotifier />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/add" element={<AddRecipe />} />

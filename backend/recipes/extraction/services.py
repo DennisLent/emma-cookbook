@@ -1,3 +1,5 @@
+"""High-level extraction flows that turn web/video sources into recipe payloads."""
+
 from .utils import (
     get_yt_transcript_cleaned,
     extract_recipe_via_ollama,

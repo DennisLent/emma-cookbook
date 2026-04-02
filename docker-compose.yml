@@ -14,9 +14,13 @@ services:
       - "6379:6379"
 
   backend:
+    image: ${EMMA_BACKEND_IMAGE:-local/emma-cookbook-backend}:${EMMA_VERSION:-dev}
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        APP_VERSION: ${EMMA_VERSION:-dev}
+        APP_GIT_SHA: ${EMMA_GIT_SHA:-local}
     env_file:
       - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
     environment:
@@ -34,10 +38,37 @@ services:
       - "8000:8000"
 
   worker:
+    image: ${EMMA_BACKEND_IMAGE:-local/emma-cookbook-backend}:${EMMA_VERSION:-dev}
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        APP_VERSION: ${EMMA_VERSION:-dev}
+        APP_GIT_SHA: ${EMMA_GIT_SHA:-local}
     command: celery -A cookbook worker -l info
+    env_file:
+      - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
+    environment:
+      RUN_MIGRATIONS: "0"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend/media:/app/media
+      - ./docker-data/vosk:/app/vosk-model
+      - ./docker-data/bootstrap:/bootstrap
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  beat:
+    image: ${EMMA_BACKEND_IMAGE:-local/emma-cookbook-backend}:${EMMA_VERSION:-dev}
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        APP_VERSION: ${EMMA_VERSION:-dev}
+        APP_GIT_SHA: ${EMMA_GIT_SHA:-local}
+    command: celery -A cookbook beat -l info
     env_file:
       - ${ENV_FILE:?Set ENV_FILE to an env file such as .env.production or dev_env}
     environment:
@@ -60,9 +91,14 @@ services:
       - "11434:11434"
 
   frontend:
+    container_name: emma-cookbook
+    image: ${EMMA_FRONTEND_IMAGE:-local/emma-cookbook-frontend}:${EMMA_VERSION:-dev}
     build:
       context: .
       dockerfile: cookbook-app/Dockerfile
+      args:
+        APP_VERSION: ${EMMA_VERSION:-dev}
+        APP_GIT_SHA: ${EMMA_GIT_SHA:-local}
     depends_on:
       - backend
     ports:

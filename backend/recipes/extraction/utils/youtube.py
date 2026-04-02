@@ -1,3 +1,5 @@
+"""Helpers for extracting and cleaning YouTube transcript content."""
+
 from youtube_transcript_api import YouTubeTranscriptApi
 import re
 

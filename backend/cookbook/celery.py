@@ -1,3 +1,5 @@
+"""Celery application bootstrap for workers and scheduled tasks."""
+
 import os
 
 from celery import Celery

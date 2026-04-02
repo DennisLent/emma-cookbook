@@ -1,3 +1,5 @@
+"""User-facing API views for profiles, admin maintenance, and update status."""
+
 from pathlib import Path
 import shutil
 import stat
@@ -17,7 +19,8 @@ from cookbook.db_backup import export_backup_data, import_backup_data
 from recipes.extraction.utils.public_video import get_vosk_model
 from recipes.models import ExtractionSettings, get_effective_ollama_model, get_effective_vosk_model_path
 from .models import User
-from .serializers import UserRegisterSerializer, UserSerializer
+from .serializers import ChangePasswordSerializer, UserRegisterSerializer, UserSerializer
+from .update_checks import check_for_updates, dismiss_update, get_update_status
 
 
 class IsSuperuser(permissions.BasePermission):
@@ -47,6 +50,72 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AppVersionView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, _request):
+        return Response(
+            {
+                "appName": django_settings.APP_NAME,
+                "version": django_settings.APP_VERSION,
+                "gitSha": django_settings.APP_GIT_SHA,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+def _serialize_update_status():
+    current = get_update_status()
+    current_version = current.current_version or django_settings.APP_VERSION
+    latest_version = current.latest_version or ""
+    repository = current.repository or django_settings.APP_UPDATE_REPOSITORY
+    return {
+        "currentVersion": current_version,
+        "latestVersion": latest_version,
+        "repository": repository,
+        "releaseUrl": current.release_url,
+        "updateAvailable": bool(current.update_available and latest_version and latest_version != current.dismissed_version),
+        "lastCheckedAt": current.last_checked_at,
+        "lastError": current.last_error,
+        "dismissedVersion": current.dismissed_version,
+        "updateChecksEnabled": bool(django_settings.APP_UPDATE_CHECK_ENABLED and repository),
+    }
+
+
+class AppUpdateStatusView(APIView):
+    permission_classes = [IsSuperuser]
+
+    def get(self, _request):
+        return Response(_serialize_update_status(), status=status.HTTP_200_OK)
+
+
+class AppUpdateCheckView(APIView):
+    permission_classes = [IsSuperuser]
+
+    def post(self, _request):
+        check_for_updates()
+        return Response(_serialize_update_status(), status=status.HTTP_200_OK)
+
+
+class AppUpdateDismissView(APIView):
+    permission_classes = [IsSuperuser]
+
+    def post(self, request):
+        version = str(request.data.get("version") or "").strip() or None
+        dismiss_update(version)
+        return Response(_serialize_update_status(), status=status.HTTP_200_OK)
 
 
 class DatabaseExportView(APIView):

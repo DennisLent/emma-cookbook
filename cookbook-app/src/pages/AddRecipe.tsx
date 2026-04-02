@@ -1,3 +1,5 @@
+// Recipe creation page, including manual entry and assisted import flows.
+
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, Plus, X, Upload, Link, ExternalLink, Salad, Droplets } from "lucide-react";

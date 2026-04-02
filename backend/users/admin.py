@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.safestring import mark_safe
 
-from .models import User
+from .models import AppUpdateStatus, User
 
 
 @admin.register(User)
@@ -77,3 +77,9 @@ class UserAdmin(BaseUserAdmin):
         return "-"
 
     avatar_preview.short_description = "Avatar"
+
+
+@admin.register(AppUpdateStatus)
+class AppUpdateStatusAdmin(admin.ModelAdmin):
+    list_display = ("current_version", "latest_version", "update_available", "last_checked_at", "dismissed_version")
+    readonly_fields = ("created_at", "updated_at")

@@ -1,3 +1,5 @@
+// Full recipe detail presentation with social actions, linked suggestions, and editing controls.
+
 import { Recipe } from "@/types/recipe";
 import { Clock, Users, ChefHat, X, Share2, Trash2, Edit, Heart, Salad, Droplets, FolderPlus, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";

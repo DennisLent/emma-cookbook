@@ -1,3 +1,5 @@
+// Lightweight UI settings context for client-only display preferences.
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 type Settings = {
@@ -15,7 +17,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 const STORAGE_KEY = "cookbook-settings";
 const DEFAULT_SETTINGS: Settings = {
-  siteTitle: "Cookbook",
+  siteTitle: "emma-cookbook",
   accentColor: "#2563EB",
   theme: "light",
 };

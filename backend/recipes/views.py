@@ -1,3 +1,5 @@
+"""REST API views for recipes, meal planning, collections, and social actions."""
+
 from django.conf import settings
 from rest_framework import viewsets, permissions, status
 from .models import Recipe, RecipeImportJob, Tag, Rating, Comment, Ingredient

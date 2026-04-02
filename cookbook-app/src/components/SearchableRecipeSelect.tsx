@@ -1,3 +1,5 @@
+// Searchable picker used when linking recipes as sides or sauces.
+
 import { useState, useRef, useEffect } from "react";
 import { Check, ChevronsUpDown, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";

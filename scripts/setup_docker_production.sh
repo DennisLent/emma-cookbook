@@ -113,10 +113,24 @@ download_vosk_model() {
 
 write_env_file() {
   cat > "${ENV_FILE_PATH}" <<EOF
+APP_NAME=emma-cookbook
+APP_VERSION=${EMMA_VERSION}
+APP_GIT_SHA=
 SECRET_KEY=${SECRET_KEY}
 DEBUG=False
 ALLOWED_HOSTS=${ALLOWED_HOSTS}
 CORS_ALLOWED_ORIGINS=${PUBLIC_APP_URL}
+
+EMMA_VERSION=${EMMA_VERSION}
+EMMA_GIT_SHA=
+EMMA_BACKEND_IMAGE=${EMMA_BACKEND_IMAGE}
+EMMA_FRONTEND_IMAGE=${EMMA_FRONTEND_IMAGE}
+APP_UPDATE_CHECK_ENABLED=${APP_UPDATE_CHECK_ENABLED}
+APP_UPDATE_REPOSITORY=${APP_UPDATE_REPOSITORY}
+APP_UPDATE_CHECK_TIMEOUT_SECONDS=10
+APP_UPDATE_CHECK_TAG_LIMIT=25
+APP_UPDATE_CHECK_SCHEDULE_HOUR=3
+APP_UPDATE_CHECK_SCHEDULE_MINUTE=0
 
 DATABASE_ENGINE=postgres
 POSTGRES_DB=${POSTGRES_DB}
@@ -164,7 +178,12 @@ EOF
 }
 
 run_compose() {
-  ENV_FILE="${ENV_FILE_PATH}" docker compose "$@"
+  ENV_FILE="${ENV_FILE_PATH}" \
+  EMMA_VERSION="${EMMA_VERSION}" \
+  EMMA_GIT_SHA="${EMMA_GIT_SHA:-}" \
+  EMMA_BACKEND_IMAGE="${EMMA_BACKEND_IMAGE}" \
+  EMMA_FRONTEND_IMAGE="${EMMA_FRONTEND_IMAGE}" \
+  docker compose "$@"
 }
 
 mkdir -p "${BOOTSTRAP_DIR}" "${VOSK_DIR}"
@@ -181,6 +200,15 @@ PUBLIC_APP_URL="$(normalize_origin_url "${PUBLIC_APP_URL_INPUT}" "${PUBLIC_URL_S
 PUBLIC_HOST="$(extract_host_from_url "${PUBLIC_APP_URL}")"
 ALLOWED_HOSTS="$(prompt_value "Django ALLOWED_HOSTS" "${PUBLIC_HOST},localhost,127.0.0.1")"
 SECRET_KEY="$(generate_secret_key)"
+EMMA_VERSION="$(prompt_value "emma-cookbook version tag" "latest")"
+DOCKERHUB_NAMESPACE="$(prompt_value "Docker Hub namespace" "dennislent")"
+EMMA_BACKEND_IMAGE="${DOCKERHUB_NAMESPACE}/emma-cookbook-backend"
+EMMA_FRONTEND_IMAGE="${DOCKERHUB_NAMESPACE}/emma-cookbook-frontend"
+APP_UPDATE_REPOSITORY="$(prompt_value "GitHub repository for update checks (owner/repo)" "DennisLent/emma-cookbook")"
+APP_UPDATE_CHECK_ENABLED="False"
+if [[ -n "${APP_UPDATE_REPOSITORY}" ]]; then
+  APP_UPDATE_CHECK_ENABLED="True"
+fi
 
 POSTGRES_DB="$(prompt_value "PostgreSQL database name" "cookbook")"
 POSTGRES_USER="$(prompt_value "PostgreSQL user" "cookbook")"
@@ -236,8 +264,13 @@ write_env_file
 echo "Preparing Vosk model..."
 download_vosk_model "${VOSK_SOURCE}"
 
-echo "Building Docker images..."
-run_compose build backend worker frontend
+if [[ "${DOCKERHUB_NAMESPACE}" == "local" ]]; then
+  echo "Building Docker images locally..."
+  run_compose build backend worker beat frontend
+else
+  echo "Pulling published Docker images..."
+  run_compose pull backend worker beat frontend
+fi
 
 echo "Starting infrastructure services..."
 run_compose up -d db redis
@@ -276,7 +309,7 @@ else
 fi
 
 echo "Starting application services..."
-run_compose up -d backend worker frontend
+run_compose up -d backend worker beat frontend
 
 cat <<EOF
 
@@ -285,6 +318,7 @@ Setup complete.
 Environment file: ${ENV_FILE_PATH}
 Frontend URL: ${PUBLIC_APP_URL}
 Admin username: ${DJANGO_SUPERUSER_USERNAME}
+Version tag: ${EMMA_VERSION}
 
 Notes:
 - If ${PUBLIC_HOST} is a custom hostname, make sure it resolves on the machine you are using.
@@ -292,4 +326,5 @@ Notes:
 - Keycloak realm/client creation is still manual
 - The Vosk model was prepared in ${VOSK_DIR}
 - If you used a JSON backup import, the backend app data was restored before the services were started.
+- To update later, run: `ENV_FILE=${ENV_FILE_PATH} ./scripts/update_docker_production.sh <tag>`
 EOF

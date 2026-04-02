@@ -1,3 +1,5 @@
+"""Import/export helpers for JSON-based application backups."""
+
 import json
 from dataclasses import dataclass
 

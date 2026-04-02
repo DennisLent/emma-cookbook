@@ -1,3 +1,5 @@
+"""LLM helpers for turning noisy cooking transcripts into structured recipe JSON."""
+
 from .youtube import get_yt_transcript_cleaned
 import ollama
 import re

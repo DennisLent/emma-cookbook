@@ -1,3 +1,5 @@
+// Shared fetch helpers that handle auth headers, token refresh, and error normalization.
+
 export const ACCESS_TOKEN_KEY = "cookbook-access-token";
 export const REFRESH_TOKEN_KEY = "cookbook-refresh-token";
 

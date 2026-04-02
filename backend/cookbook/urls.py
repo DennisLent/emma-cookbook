@@ -1,3 +1,5 @@
+"""Top-level URL routing for API, auth, admin, and media endpoints."""
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -8,7 +10,7 @@ from django.urls import re_path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from recipes.views import CollectionViewSet, RecipeImportJobViewSet, RecipeViewSet, TagViewSet, RatingViewSet, CommentViewSet, IngredientViewSet
-from users.views import DatabaseExportView, DatabaseImportView, ExtractionSettingsView, UserRegisterView, UserDetailView, VoskModelUploadView
+from users.views import AppUpdateCheckView, AppUpdateDismissView, AppUpdateStatusView, AppVersionView, ChangePasswordView, DatabaseExportView, DatabaseImportView, ExtractionSettingsView, UserRegisterView, UserDetailView, VoskModelUploadView
 
 
 router = DefaultRouter()
@@ -37,7 +39,12 @@ urlpatterns = [
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/register/', UserRegisterView.as_view(), name='auth_register'),
+    path('api/app/version/', AppVersionView.as_view(), name='app_version'),
+    path('api/app/update-status/', AppUpdateStatusView.as_view(), name='app_update_status'),
+    path('api/app/update-status/check/', AppUpdateCheckView.as_view(), name='app_update_check'),
+    path('api/app/update-status/dismiss/', AppUpdateDismissView.as_view(), name='app_update_dismiss'),
     path('api/users/me/', UserDetailView.as_view(), name='user_detail'),
+    path('api/users/me/change-password/', ChangePasswordView.as_view(), name='change_password'),
     path('api/database/export/', DatabaseExportView.as_view(), name='database_export'),
     path('api/database/import/', DatabaseImportView.as_view(), name='database_import'),
     path('api/settings/extraction-models/', ExtractionSettingsView.as_view(), name='extraction_settings'),

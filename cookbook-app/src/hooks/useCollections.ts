@@ -1,3 +1,5 @@
+// Collection context used to group recipes into user-defined saved sets.
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import React from "react";
 import { apiRequest } from "@/lib/api";

@@ -1,3 +1,5 @@
+// Shared star rating display/input used across cards and detail views.
+
  import { Star } from "lucide-react";
  import { cn } from "@/lib/utils";
  

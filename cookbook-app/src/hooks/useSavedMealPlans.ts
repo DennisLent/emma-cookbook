@@ -1,3 +1,5 @@
+// Local-storage helpers for saving generated meal plans in the browser.
+
 import { useState, useEffect, useCallback } from "react";
 
 type MealType = "breakfast" | "lunch" | "dinner";

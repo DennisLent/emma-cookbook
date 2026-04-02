@@ -1,3 +1,5 @@
+// Main browse/search experience for recipes, collections, and quick navigation.
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Search, ChefHat, Plus, Settings as SettingsIcon, LogIn, User, Heart, Star, Calendar, UtensilsCrossed, FolderPlus, ChevronLeft, ChevronRight, X, Bookmark, Loader2 } from "lucide-react";

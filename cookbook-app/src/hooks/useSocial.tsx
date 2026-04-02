@@ -1,3 +1,5 @@
+// Social context for favorites, ratings, and comments layered on top of recipe data.
+
 import { createContext, useContext, ReactNode, useCallback, useMemo } from "react";
 import { Comment, Rating, RecipeSocialData } from "@/types/social";
 import { useAuth } from "@/hooks/useAuth";

@@ -1,3 +1,5 @@
+// Theme palette definitions used to drive the app's branded color modes.
+
 // All color schemes are WCAG AA compliant
 // HSL values for use with CSS variables
 

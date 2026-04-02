@@ -1,3 +1,5 @@
+// Recipe data context that keeps the list view, pagination, and CRUD helpers in sync.
+
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { Recipe } from "@/types/recipe";
 import { apiRequest } from "@/lib/api";
@@ -226,7 +228,7 @@ export function RecipesProvider({ children }: { children: ReactNode }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `cookbook-recipes-${new Date().toISOString().split("T")[0]}.json`;
+    link.download = `emma-cookbook-recipes-${new Date().toISOString().split("T")[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
