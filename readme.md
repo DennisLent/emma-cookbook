@@ -1,7 +1,7 @@
 # emma-cookbook
 
 [![codecov](https://codecov.io/gh/DennisLent/emma-cookbook/graph/badge.svg?token=W0GE17FY1I)](https://codecov.io/gh/DennisLent/emma-cookbook)
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-2ea44f)](https://dennislent.github.io/cookbook/)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-2ea44f)](https://dennislent.github.io/emma-cookbook/)
 
 EMMA stands for Easy Meals Made Accessible.
 
