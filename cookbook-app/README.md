@@ -35,4 +35,4 @@ npm run build
 ## Notes
 
 - The current frontend still uses local/mock state for most domain data.
-- Backend integration and schema alignment are documented in `docs/`.
+- Backend integration and schema alignment are documented at https://dennislent.github.io/cookbook/.

@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches:
-      - "**"
+      - main
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -16,17 +19,29 @@ jobs:
       DATABASE_ENGINE: sqlite
       SECRET_KEY: ci-secret-key
       DEBUG: "False"
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install backend dependencies
-        run: pip install -r ../requirements.txt
+        run: pip install -r ../requirements.txt coverage
       - name: Run migrations
         run: python manage.py migrate --noinput
       - name: Run backend tests
-        run: python manage.py test users.tests.test_tag_inference users.tests.test_app_version_api users.tests.test_app_update_api users.tests.test_change_password_api recipes.tests_contract
+        run: coverage run --source=cookbook,recipes,users manage.py test users.tests.test_tag_inference users.tests.test_app_version_api users.tests.test_app_update_api users.tests.test_change_password_api recipes.tests_contract
+      - name: Build backend coverage report
+        run: coverage xml -o coverage.xml
+      - name: Upload backend coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   live-import-smoke:
     runs-on: ubuntu-latest
@@ -66,6 +81,8 @@ jobs:
     defaults:
       run:
         working-directory: cookbook-app
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -75,8 +92,17 @@ jobs:
           cache-dependency-path: cookbook-app/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
-      - name: Run frontend unit tests
-        run: npm run test:unit -- --run
+      - name: Run frontend unit tests with coverage
+        run: npm run test:coverage
+      - name: Upload frontend coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: cookbook-app/coverage/lcov.info,cookbook-app/coverage/cobertura-coverage.xml
+          flags: frontend
+          name: frontend-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
       - name: Build frontend
         run: npm run build
 

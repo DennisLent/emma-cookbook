@@ -1,5 +1,8 @@
 # emma-cookbook
 
+[![codecov](https://codecov.io/gh/DennisLent/cookbook/graph/badge.svg)](https://codecov.io/gh/DennisLent/cookbook)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-2ea44f)](https://dennislent.github.io/cookbook/)
+
 EMMA stands for Easy Meals Made Accessible.
 
 emma-cookbook is a self-hosted recipe app built for local and home use. It is made for people who want a private cookbook on their own network, with a simple interface that feels good on both desktop and mobile.
@@ -46,6 +49,7 @@ Desktop             |  Mobile
 
 The docs keep the setup simple. You can run emma-cookbook locally for development, or bring up the full Docker stack for a more complete deployment.
 
-- [Introduction](docs-site/introduction.md)
-- [Setup](docs-site/setup.md)
-- [Admin guide](docs-site/admin-guide.md)
+- [Documentation home](https://dennislent.github.io/emma-cookbook/)
+- [Introduction](https://dennislent.github.io/emma-cookbook/introduction/)
+- [Setup](https://dennislent.github.io/emma-cookbook/setup/)
+- [Admin guide](https://dennislent.github.io/emma-cookbook/admin-guide/)
