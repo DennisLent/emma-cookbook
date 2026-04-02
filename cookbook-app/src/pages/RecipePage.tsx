@@ -1,3 +1,5 @@
+// Detail route that switches between full recipe view and cook mode.
+
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";

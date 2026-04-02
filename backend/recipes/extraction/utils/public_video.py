@@ -1,3 +1,5 @@
+"""Shared utilities for validating, downloading, and transcribing public videos."""
+
 import json
 import os
 import re

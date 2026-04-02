@@ -1,59 +1,51 @@
-# Cookbook
+# emma-cookbook
 
-## Local Backend Setup
+EMMA stands for Easy Meals Made Accessible.
 
-Use the helper scripts in [scripts/setup_local.sh](/scripts/setup_local.sh) and [scripts/destroy_local.sh](/scripts/destroy_local.sh) to create and reset a disposable local backend instance backed by SQLite.
+emma-cookbook is a self-hosted recipe app built for local and home use. It is made for people who want a private cookbook on their own network, with a simple interface that feels good on both desktop and mobile.
 
-Create a local instance with a seeded superuser:
+![Desktop home view](docs-site/images/homepage_desktop.png)
 
-```sh
-./scripts/setup_local.sh
-```
+This is the kind of app you open when you are hungry, half-organised, and trying to answer the eternal question of what to cook tonight. Instead of scattering recipes across browser bookmarks, social videos, notes apps, and screenshots, emma-cookbook pulls everything into one place and makes it actually usable.
 
-Override the default superuser credentials if needed:
+## A Cookbook That Wants To Be Used
 
-```sh
-LOCAL_SUPERUSER_USERNAME=superuser LOCAL_SUPERUSER_PASSWORD=secret ./scripts/setup_local.sh
-```
+emma-cookbook is not just a place to dump links. It is designed to help you find the right recipe quickly, whether you remember the name, a tag, a favorite, a rating, or the collection you saved it in. Recipe pages are built to be useful in the middle of cooking, with ingredients, servings, source links, comments, ratings, and room for the little details that usually get lost.
 
-Destroy the local SQLite database and uploaded media so the next setup starts fresh:
+![Recipe detail page](docs-site/images/feature_rich_recipes.png)
 
-```sh
-./scripts/destroy_local.sh
-```
+Cook mode keeps the process moving by walking through the recipe step by step and matching ingredients automatically along the way. It is built for real cooking, not just pretty browsing.
 
-Video import jobs support public YouTube, Instagram, and TikTok URLs. For local video imports to work end to end, the backend also needs `yt-dlp`, `ffmpeg`, and a Vosk model available.
+## Bring In Recipes From The Places People Actually Find Them
 
-## Database Backup
+Some recipes are handwritten. Some come from websites. Some come from a TikTok that you found while doomscrolling. emma-cookbook supports all of that.
 
-The backend exposes admin-only JSON backup and restore endpoints that are used by the frontend Settings page:
+You can add recipes manually or import them from the web, Instagram, YouTube, and TikTok. When a supported video includes spoken instructions, the app can extract the useful bits and fold them into the recipe flow. You can also keep imported videos in the app, which means less scrolling through your history and less trying to remember who posted that pasta thing three weeks ago.
 
-- `GET /api/database/export/`
-- `POST /api/database/import/`
+![Add recipe flows](docs-site/images/adding_recipes.png)
 
-For shell-based workflows, use:
+## Built For Actual Kitchen Chaos
 
-```sh
-./scripts/export_db.sh
-./scripts/import_db.sh <backup-file>
-```
+emma-cookbook makes it easier to work with what you already have. You can tag recipes as mains, sides, or sauces, suggest pairings for specific dishes, and match recipes against ingredients already in your fridge. That makes the app feel less like a static archive and more like a helpful kitchen sidekick.
 
-`export_db.sh` and `import_db.sh` support both the local SQLite setup and the Docker/Postgres setup, based on `DATABASE_ENGINE`.
+![Ingredient matching](docs-site/images/ingredients_matching.png)
 
-## Docker Production Setup
+Meal planning is part of the fun too. You can build plans around what you want to cook, turn those plans into shopping lists, and export them as PDFs so they are easy to bring to the supermarket without needing your whole home setup with you.
 
-Run the interactive Docker bootstrap with:
+![Meal planning](docs-site/images/meal_plan.png)
 
-```sh
-./scripts/setup_docker_production.sh
-```
+## Looks Good On The Counter And In Your Pocket
 
-It creates a production env file, prepares the Vosk model, optionally imports an existing backup, optionally starts Ollama and pulls a model, bootstraps the Django admin user, and then starts the Docker stack.
+The app is built to feel comfortable on a kitchen counter, a laptop, or a phone.
 
-## Docker rebuild
+Desktop             |  Mobile
+:-------------------------:|:-------------------------:
+![Desktop homepage](docs-site/images/homepage_desktop.png)  |  ![Mobile homepage](docs-site/images/homepage_mobile.png)
 
-When changes are made to the project or to the env file, rebuild the entire stack using:
+## Want To Run It Yourself?
 
-```sh
-ENV_FILE=.env.production docker compose up --build -d
-```
+The docs keep the setup simple. You can run emma-cookbook locally for development, or bring up the full Docker stack for a more complete deployment.
+
+- [Introduction](docs-site/introduction.md)
+- [Setup](docs-site/setup.md)
+- [Admin guide](docs-site/admin-guide.md)

@@ -1,3 +1,5 @@
+// Comment thread UI for recipe discussions and author-side moderation actions.
+
  import { useState } from "react";
  import { Comment } from "@/types/social";
  import { useSocial } from "@/hooks/useSocial";

@@ -1,3 +1,5 @@
+// Operational settings page for superuser maintenance tasks and model configuration.
+
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Trash2, Upload } from "lucide-react";
@@ -26,6 +28,18 @@ type ExtractionSettings = {
   voskModelPathOptions: string[];
 };
 
+type AppUpdateStatus = {
+  currentVersion: string;
+  latestVersion: string;
+  repository: string;
+  releaseUrl: string;
+  updateAvailable: boolean;
+  lastCheckedAt?: string | null;
+  lastError?: string;
+  dismissedVersion?: string;
+  updateChecksEnabled: boolean;
+};
+
 function formatBytes(value?: number | null) {
   if (!value || value <= 0) return null;
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -51,6 +65,9 @@ export default function Settings() {
   const [isPullingModel, setIsPullingModel] = useState(false);
   const [isUploadingVoskModel, setIsUploadingVoskModel] = useState(false);
   const [busyModelName, setBusyModelName] = useState<string | null>(null);
+  const [appUpdateStatus, setAppUpdateStatus] = useState<AppUpdateStatus | null>(null);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [isDismissingUpdate, setIsDismissingUpdate] = useState(false);
 
   useEffect(() => {
     if (!user?.isSuperuser) {
@@ -66,13 +83,23 @@ export default function Settings() {
       .catch(() => undefined);
   }, [user?.isSuperuser]);
 
+  useEffect(() => {
+    if (!user?.isSuperuser) {
+      return;
+    }
+
+    apiRequest<AppUpdateStatus>("/app/update-status/")
+      .then((data) => setAppUpdateStatus(data))
+      .catch(() => undefined);
+  }, [user?.isSuperuser]);
+
   const handleExport = async () => {
     try {
       const blob = await apiDownload("/database/export/");
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `cookbook-backup-${new Date().toISOString().split("T")[0]}.json`;
+      link.download = `emma-cookbook-backup-${new Date().toISOString().split("T")[0]}.json`;
       link.click();
       URL.revokeObjectURL(url);
       toast({ title: "Database backup exported" });
@@ -232,6 +259,54 @@ export default function Settings() {
     }
   };
 
+  const handleCheckForUpdates = async () => {
+    setIsCheckingUpdates(true);
+    try {
+      const status = await apiRequest<AppUpdateStatus>("/app/update-status/check/", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setAppUpdateStatus(status);
+      toast({
+        title: status.updateAvailable ? `Update available: ${status.latestVersion}` : "No updates found",
+        description: status.updateAvailable
+          ? `Only a superuser with Docker access on the host can apply the ${status.latestVersion} update.`
+          : "The running version is already up to date or update checks are not fully configured.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to check for updates",
+        description: getApiErrorMessage(error, "The backend could not check for updates."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  };
+
+  const handleDismissUpdate = async () => {
+    setIsDismissingUpdate(true);
+    try {
+      const status = await apiRequest<AppUpdateStatus>("/app/update-status/dismiss/", {
+        method: "POST",
+        body: JSON.stringify({ version: appUpdateStatus?.latestVersion || "" }),
+      });
+      setAppUpdateStatus(status);
+      toast({
+        title: "Update notice dismissed",
+        description: "You can still check again manually from this page at any time.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to dismiss update notice",
+        description: getApiErrorMessage(error, "The update notice could not be dismissed."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsDismissingUpdate(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <header className="border-b bg-card sticky top-0 z-40 backdrop-blur">
@@ -248,71 +323,142 @@ export default function Settings() {
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-8">
         {user?.isSuperuser && (
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Extraction Models</h2>
+            <h2 className="text-lg font-semibold">Updates</h2>
 
-            <div className="space-y-2">
-              <Label htmlFor="newOllamaModel">Add Ollama Model</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="newOllamaModel"
-                  value={newOllamaModel}
-                  onChange={(e) => setNewOllamaModel(e.target.value)}
-                  placeholder="e.g. llama3.2:latest"
-                />
-                <Button onClick={() => void handlePullOllamaModel()} disabled={isPullingModel}>
-                  Pull Model
+            <div className="rounded-lg border p-4 space-y-4">
+              {!appUpdateStatus?.updateChecksEnabled && (
+                <div className="rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                  Update checks are not configured yet. Set `APP_UPDATE_REPOSITORY` in the production env file to enable daily checks.
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Current version</p>
+                <p className="font-medium">{appUpdateStatus?.currentVersion || "Unknown"}</p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Latest available version</p>
+                <p className="font-medium">{appUpdateStatus?.latestVersion || "No release detected yet"}</p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Repository</p>
+                <p className="font-medium">{appUpdateStatus?.repository || "Not configured"}</p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Last checked</p>
+                <p className="font-medium">
+                  {appUpdateStatus?.lastCheckedAt ? new Date(appUpdateStatus.lastCheckedAt).toLocaleString() : "Never"}
+                </p>
+              </div>
+
+              {appUpdateStatus?.lastError && (
+                <p className="text-sm text-muted-foreground">
+                  Update check status: {appUpdateStatus.lastError}
+                </p>
+              )}
+
+              {appUpdateStatus?.updateAvailable && (
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+                  A newer version is available. Only a superuser with access to the Docker host can apply it.
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void handleCheckForUpdates()} disabled={isCheckingUpdates}>
+                  Check for Updates
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void handleDismissUpdate()}
+                  disabled={isDismissingUpdate || !appUpdateStatus?.updateAvailable}
+                >
+                  Dismiss Notice
                 </Button>
               </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Apply updates from the Docker host with:
+                </p>
+                <pre className="rounded-md bg-muted p-3 text-sm overflow-x-auto">
+                  <code>ENV_FILE=.env.production ./scripts/update_docker_production.sh {appUpdateStatus?.latestVersion || "&lt;tag&gt;"}</code>
+                </pre>
+              </div>
+
               <p className="text-sm text-muted-foreground">
-                Pull a model into Ollama, then activate it below.
+                Update notices are only shown to superusers. The update job checks the configured GitHub repository once per day through Celery Beat.
               </p>
             </div>
 
-            <div className="space-y-3">
-              <Label>Installed Ollama Models</Label>
-              {(extractionSettings?.installedOllamaModels || []).length > 0 ? (
-                <div className="space-y-3">
-                  {extractionSettings?.installedOllamaModels.map((model) => (
-                    <div key={model.name} className="rounded-lg border p-4 space-y-3">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium">{model.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {[model.family, model.parameterSize, model.quantizationLevel, formatBytes(model.size)].filter(Boolean).join(" • ") || "No extra metadata"}
-                          </p>
-                        </div>
-                        {model.isActive && (
-                          <span className="text-xs font-medium uppercase tracking-wide text-primary">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant={model.isActive ? "secondary" : "default"}
-                          disabled={model.isActive || busyModelName === model.name}
-                          onClick={() => void handleActivateOllamaModel(model.name)}
-                        >
-                          Use This Model
-                        </Button>
-                        <Button
-                          variant="outline"
-                          disabled={model.isActive || busyModelName === model.name}
-                          onClick={() => void handleDeleteOllamaModel(model.name)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+            <h2 className="text-lg font-semibold">Extraction Models</h2>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newOllamaModel">Add Ollama Model</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="newOllamaModel"
+                    value={newOllamaModel}
+                    onChange={(e) => setNewOllamaModel(e.target.value)}
+                    placeholder="e.g. llama3.2:latest"
+                  />
+                  <Button onClick={() => void handlePullOllamaModel()} disabled={isPullingModel}>
+                    Pull Model
+                  </Button>
                 </div>
-              ) : (
                 <p className="text-sm text-muted-foreground">
-                  No installed Ollama models were discovered yet.
+                  Pull a model into Ollama, then activate it below.
                 </p>
-              )}
-            </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Installed Ollama Models</Label>
+                {(extractionSettings?.installedOllamaModels || []).length > 0 ? (
+                  <div className="space-y-3">
+                    {extractionSettings?.installedOllamaModels.map((model) => (
+                      <div key={model.name} className="rounded-lg border p-4 space-y-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{model.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {[model.family, model.parameterSize, model.quantizationLevel, formatBytes(model.size)].filter(Boolean).join(" • ") || "No extra metadata"}
+                            </p>
+                          </div>
+                          {model.isActive && (
+                            <span className="text-xs font-medium uppercase tracking-wide text-primary">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant={model.isActive ? "secondary" : "default"}
+                            disabled={model.isActive || busyModelName === model.name}
+                            onClick={() => void handleActivateOllamaModel(model.name)}
+                          >
+                            Use This Model
+                          </Button>
+                          <Button
+                            variant="outline"
+                            disabled={model.isActive || busyModelName === model.name}
+                            onClick={() => void handleDeleteOllamaModel(model.name)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No installed Ollama models were discovered yet.
+                  </p>
+                )}
+              </div>
 
             <div className="space-y-2">
               <Label htmlFor="voskModelPath">Vosk Model Path</Label>
@@ -359,6 +505,7 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground">
               These settings affect future recipe imports only and are only available to the Django superuser.
             </p>
+            </div>
           </section>
         )}
 

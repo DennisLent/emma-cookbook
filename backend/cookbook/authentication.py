@@ -1,3 +1,5 @@
+"""Custom authentication backends used by the API."""
+
 from typing import Optional, Tuple
 
 from django.contrib.auth import get_user_model

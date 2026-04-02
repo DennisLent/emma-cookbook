@@ -1,4 +1,8 @@
 FROM node:20 AS build
+ARG APP_VERSION=dev
+ARG APP_GIT_SHA=local
+ENV VITE_APP_VERSION=${APP_VERSION}
+ENV VITE_APP_GIT_SHA=${APP_GIT_SHA}
 WORKDIR /app
 
 COPY cookbook-app/package*.json ./

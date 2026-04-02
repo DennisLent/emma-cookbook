@@ -1,3 +1,5 @@
+"""Core recipe-domain models used throughout the API and background jobs."""
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone

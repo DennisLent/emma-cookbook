@@ -1,3 +1,5 @@
+// Meal-plan generation page with save/load, swap, and shopping-list workflows.
+
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, RefreshCw, Calendar, UtensilsCrossed, ShoppingCart, Save, FolderOpen, Salad, Droplets, ChevronDown } from "lucide-react";

@@ -1,6 +1,9 @@
+"""Central Django settings for local, Docker, and production deployments."""
+
 from pathlib import Path
 from decouple import Config, RepositoryEnv, Csv
 from corsheaders.defaults import default_headers
+from celery.schedules import crontab
 import os
 from datetime import timedelta
 
@@ -43,6 +46,15 @@ SECRET_KEY = config('SECRET_KEY', default='dev-secret-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config_bool('DEBUG', default=False)
 USE_S3_MEDIA_STORAGE = config_bool('USE_S3_MEDIA_STORAGE', default=False)
+APP_NAME = config('APP_NAME', default='EMMA')
+APP_VERSION = config('APP_VERSION', default='dev')
+APP_GIT_SHA = config('APP_GIT_SHA', default='')
+APP_UPDATE_CHECK_ENABLED = config_bool('APP_UPDATE_CHECK_ENABLED', default=True)
+APP_UPDATE_REPOSITORY = config('APP_UPDATE_REPOSITORY', default='')
+APP_UPDATE_CHECK_TIMEOUT_SECONDS = config('APP_UPDATE_CHECK_TIMEOUT_SECONDS', cast=int, default=10)
+APP_UPDATE_CHECK_TAG_LIMIT = config('APP_UPDATE_CHECK_TAG_LIMIT', cast=int, default=25)
+APP_UPDATE_CHECK_SCHEDULE_HOUR = config('APP_UPDATE_CHECK_SCHEDULE_HOUR', cast=int, default=3)
+APP_UPDATE_CHECK_SCHEDULE_MINUTE = config('APP_UPDATE_CHECK_SCHEDULE_MINUTE', cast=int, default=0)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
@@ -288,6 +300,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = config_bool('CELERY_TASK_ALWAYS_EAGER', default=False)
 CELERY_TASK_EAGER_PROPAGATES = config_bool('CELERY_TASK_EAGER_PROPAGATES', default=False)
+CELERY_BEAT_SCHEDULE = {
+    'check_app_updates_daily': {
+        'task': 'users.tasks.check_for_app_updates',
+        'schedule': crontab(
+            hour=APP_UPDATE_CHECK_SCHEDULE_HOUR,
+            minute=APP_UPDATE_CHECK_SCHEDULE_MINUTE,
+        ),
+    },
+}
 
 RECIPE_IMPORT_MAX_FILESIZE_BYTES = config('RECIPE_IMPORT_MAX_FILESIZE_BYTES', cast=int, default=104857600)
 RECIPE_IMPORT_DOWNLOAD_TIMEOUT_SECONDS = config('RECIPE_IMPORT_DOWNLOAD_TIMEOUT_SECONDS', cast=int, default=180)

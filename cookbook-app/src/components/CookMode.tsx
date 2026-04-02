@@ -1,3 +1,5 @@
+// Focused cooking interface with timers, step navigation, and ingredient highlighting.
+
 import { Recipe } from "@/types/recipe";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";

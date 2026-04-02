@@ -1,3 +1,5 @@
+// Saved meal-plan list used by the meal-plan page to reload and manage prior plans.
+
 import { useState } from "react";
 import { Calendar, Trash2, FolderOpen, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";

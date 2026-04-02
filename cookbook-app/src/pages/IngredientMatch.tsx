@@ -1,3 +1,5 @@
+// Ingredient matching page that suggests recipes based on what the user has available.
+
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, X, Plus, ChefHat, Search } from "lucide-react";

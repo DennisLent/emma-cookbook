@@ -1,3 +1,5 @@
+// Authentication context that owns the logged-in user, tokens, and profile mutations.
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { applyColorScheme, defaultScheme } from "@/lib/colorSchemes";
 import { apiRequest, clearTokens, setTokens } from "@/lib/api";
@@ -28,6 +30,7 @@ type AuthContextType = {
   signup: (username: string, password: string, name: string, email?: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (updates: Partial<User>, avatarFile?: File) => Promise<User>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
 };
 
@@ -183,6 +186,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return normalized;
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    if (!user) {
+      throw new Error("You must be logged in to change your password.");
+    }
+
+    await apiRequest("/users/me/change-password/", {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+        new_password2: newPassword,
+      }),
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -191,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signup,
         logout,
         updateProfile,
+        changePassword,
         isAuthenticated: !!user,
       }}
     >

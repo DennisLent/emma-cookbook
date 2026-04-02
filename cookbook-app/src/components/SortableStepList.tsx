@@ -1,3 +1,5 @@
+// Drag-and-drop editor for ordering and annotating recipe steps.
+
 import { useRef, useState, useMemo } from "react";
 import {
   DndContext,

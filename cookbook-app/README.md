@@ -1,6 +1,6 @@
-# Cookbook Frontend
+# emma-cookbook Frontend
 
-React/Vite frontend for the Cookbook application.
+React/Vite frontend for the emma-cookbook application. EMMA stands for Easy Meals Made Accessible.
 
 ## Local development
 

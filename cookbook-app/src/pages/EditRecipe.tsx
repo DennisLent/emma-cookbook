@@ -1,3 +1,5 @@
+// Recipe editing page for updating existing recipes and their linked suggestions.
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, X, Upload, Salad, Droplets } from "lucide-react";

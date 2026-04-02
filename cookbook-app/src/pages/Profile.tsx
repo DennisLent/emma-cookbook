@@ -1,3 +1,5 @@
+// Profile management page for account details, password changes, and UI preferences.
+
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,10 +18,15 @@ import { getApiErrorMessage } from "@/lib/api";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, updateProfile, isAuthenticated } = useAuth();
+  const { user, updateProfile, changePassword, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
+  });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,13 +57,37 @@ export default function Profile() {
     }
   };
 
-  const handlePrefChange = async (key: keyof typeof user.prefs, value: any) => {
+  const handlePrefChange = async (
+    key: keyof typeof user.prefs,
+    value: string | boolean,
+  ) => {
     try {
       await updateProfile({
         prefs: { ...user.prefs, [key]: value },
       });
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Preference update failed."));
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
+    try {
+      await changePassword(passwordData.currentPassword, passwordData.newPassword);
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      toast.success("Password updated successfully");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Password update failed."));
     }
   };
 
@@ -143,6 +174,48 @@ export default function Profile() {
                   />
                 </div>
                 <Button type="submit">Save Changes</Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+              <CardDescription>Use your current password to set a new one</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    required
+                  />
+                </div>
+                <Button type="submit">Update Password</Button>
               </form>
             </CardContent>
           </Card>
