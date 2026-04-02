@@ -17,7 +17,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 const STORAGE_KEY = "cookbook-settings";
 const DEFAULT_SETTINGS: Settings = {
-  siteTitle: "emma-cookbook",
+  siteTitle: "EMMA",
   accentColor: "#2563EB",
   theme: "light",
 };

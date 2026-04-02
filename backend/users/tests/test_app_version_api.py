@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 
 class AppVersionApiTests(APITestCase):
-    @override_settings(APP_NAME="emma-cookbook", APP_VERSION="v1.2.3", APP_GIT_SHA="abc123def456")
+    @override_settings(APP_NAME="EMMA", APP_VERSION="v1.2.3", APP_GIT_SHA="abc123def456")
     def test_app_version_endpoint_returns_runtime_metadata(self):
         response = self.client.get(reverse("app_version"))
 
@@ -13,7 +13,7 @@ class AppVersionApiTests(APITestCase):
         self.assertEqual(
             response.data,
             {
-                "appName": "emma-cookbook",
+                "appName": "EMMA",
                 "version": "v1.2.3",
                 "gitSha": "abc123def456",
             },

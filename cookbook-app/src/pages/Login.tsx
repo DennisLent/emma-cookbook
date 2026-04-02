@@ -42,7 +42,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <ChefHat className="h-12 w-12 mx-auto mb-4 text-primary" />
-          <h1 className="text-3xl font-semibold mb-2">Welcome to emma-cookbook</h1>
+          <h1 className="text-3xl font-semibold mb-2">Welcome to EMMA</h1>
           <p className="text-muted-foreground">
             Easy Meals Made Accessible. Browse recipes as a guest, or sign in to personalize your experience.
           </p>

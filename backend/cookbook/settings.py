@@ -46,7 +46,7 @@ SECRET_KEY = config('SECRET_KEY', default='dev-secret-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config_bool('DEBUG', default=False)
 USE_S3_MEDIA_STORAGE = config_bool('USE_S3_MEDIA_STORAGE', default=False)
-APP_NAME = config('APP_NAME', default='emma-cookbook')
+APP_NAME = config('APP_NAME', default='EMMA')
 APP_VERSION = config('APP_VERSION', default='dev')
 APP_GIT_SHA = config('APP_GIT_SHA', default='')
 APP_UPDATE_CHECK_ENABLED = config_bool('APP_UPDATE_CHECK_ENABLED', default=True)
